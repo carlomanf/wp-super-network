@@ -39,8 +39,12 @@ class WP_Super_Network
 		if ( 'funnel' != $post->post_type )
 			return $actions;
 
-		$url = admin_url( 'edit.php?post_type=funnel_int&post_parent=' . $post->ID );
-		$actions['republish'] = '<a href="' . esc_url( $url ) . '">' . __( 'Republish', 'supernetwork' ) . '</a>';
+		if ( empty( get_post_meta( $post->ID, '_supernetwork_share' ) ) )
+			$actions['republish'] = '<a href="">' . __( 'Republish', 'supernetwork' ) . '</a>';
+		else
+			$actions['republish'] = '<b style="color: #555;">' . __( 'Republished', 'supernetwork' ) . '</b> <a href="">(' . __( 'Revoke?', 'supernetwork' ) . ')</a>';
+
+		//update_post_meta( $post->ID, '_supernetwork_share', '1' );
 
 		return $actions;
 	}

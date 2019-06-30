@@ -20,6 +20,8 @@ if ( ! defined( 'SUPER_NETWORK_URL' ) )
 }
 
 // Load classes.
+require SUPER_NETWORK_DIR . '/src/blog.php';
+require SUPER_NETWORK_DIR . '/src/network.php';
 require SUPER_NETWORK_DIR . '/src/plugin.php';
 
 // Initialize the plugin.

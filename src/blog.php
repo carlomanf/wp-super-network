@@ -24,5 +24,7 @@ class WPSN_Blog
 	 */
 	public function upgrade_to_network()
 	{
+		if ( function_exists( 'get_network' ) )
+			update_option( '_supernetwork_parent_site', (string) get_network()->get_main_site_id() );
 	}
 }

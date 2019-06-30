@@ -36,7 +36,7 @@ class WP_Super_Network
 	 * @since 1.0.4
 	 */
 	public function republish( $actions, $post ) {
-		if ( 'funnel' != $post->post_type )
+		if ( 'post' != $post->post_type && 'page' != $post->post_type )
 			return $actions;
 
 		if ( empty( get_post_meta( $post->ID, '_supernetwork_share' ) ) )

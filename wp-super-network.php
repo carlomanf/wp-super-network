@@ -61,3 +61,8 @@ if ( false )
 
 	return false;
 }
+
+/**
+ * Load plugin initialisation file.
+ */
+require plugin_dir_path( __FILE__ ) . '/init.php';

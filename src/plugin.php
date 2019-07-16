@@ -55,10 +55,12 @@ class WP_Super_Network
 		if ( 'post' != $post->post_type && 'page' != $post->post_type )
 			return $actions;
 
+		$link = 'page' == $post->post_type ? admin_url( 'edit.php?post_type=page&republish=' . $post->ID ) : admin_url( 'edit.php?republish=' . $post->ID );
+
 		if ( empty( get_post_meta( $post->ID, '_supernetwork_share' ) ) )
-			$actions['republish'] = '<a href="">' . __( 'Republish', 'supernetwork' ) . '</a>';
+			$actions['republish'] = '<a href="' . $link . '">' . __( 'Republish', 'supernetwork' ) . '</a>';
 		else
-			$actions['republish'] = '<b style="color: #555;">' . __( 'Republished', 'supernetwork' ) . '</b> <a href="">(' . __( 'Revoke?', 'supernetwork' ) . ')</a>';
+			$actions['republish'] = '<b style="color: #555;">' . __( 'Republished', 'supernetwork' ) . '</b> <a href="' . $link . '">(' . __( 'Revoke?', 'supernetwork' ) . ')</a>';
 
 		//update_post_meta( $post->ID, '_supernetwork_share', '1' );
 

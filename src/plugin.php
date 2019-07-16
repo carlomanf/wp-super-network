@@ -8,6 +8,18 @@
  */
 class WP_Super_Network
 {
+	/**
+	 * Static instance of the plugin.
+	 */
+	protected static $instance;
+
+	/**
+	 * Current network.
+	 *
+	 * @since 1.0.4
+	 * @var WPSN_Network
+	 */
+	public $network;
 
 	/**
 	 * Instantiate a WP_Super_Network object.
@@ -17,6 +29,10 @@ class WP_Super_Network
 	 */
 	public function __construct()
 	{
+		if ( function_exists( 'get_network' ) )
+		{
+			$this->network = new WPSN_Network( array() );
+		}
 	}
 
 	/**

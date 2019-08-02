@@ -1,4 +1,4 @@
-<?php
+<?php namespace WP_Super_Network;
 /**
  * Initialise the plugin
  */

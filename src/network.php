@@ -1,9 +1,9 @@
-<?php
+<?php namespace WP_Super_Network;
 
 /**
  * Main network class.
  */
-class WPSN_Network
+class Network extends \WP_Network
 {
 	/**
 	 * Supernetwork

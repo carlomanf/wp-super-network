@@ -1,9 +1,9 @@
-<?php
+<?php namespace WP_Super_Network;
 
 /**
  * Main blog class.
  */
-class WPSN_Blog
+class Blog
 {
 
 	/**

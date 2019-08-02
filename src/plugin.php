@@ -1,4 +1,4 @@
-<?php
+<?php namespace WP_Super_Network;
 /**
  * Main plugin file
  */
@@ -31,7 +31,7 @@ class WP_Super_Network
 	{
 		if ( function_exists( 'get_network' ) )
 		{
-			$this->network = new WPSN_Network( array() );
+			$this->network = new Network( array() );
 		}
 	}
 

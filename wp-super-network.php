@@ -15,7 +15,7 @@ if ( ! defined( 'WPINC' ) )
 	die;
 }
 
-if ( false )
+if ( ! defined( 'MULTISITE' ) || ! MULTISITE )
 {
 	add_action( 'plugins_loaded', 'supernetwork_init_deactivation' );
 
@@ -44,12 +44,7 @@ if ( false )
 	 */
 	function supernetwork_deactivation_notice()
 	{
-		$notice = sprintf(
-			// Translators: 1: Required PHP version, 2: Current PHP version.
-			'<strong>WP Super Network</strong> requires PHP %1$s to run. This site uses %2$s, so the plugin has been <strong>deactivated</strong>.',
-			'7.1',
-			PHP_VERSION
-		);
+		$notice = '<strong>WP Super Network</strong> requires multisite to run. This is currently not a multisite, so the plugin has been <strong>deactivated</strong>.';
 		?>
 		<div class="updated"><p><?php echo wp_kses_post( $notice ); ?></p></div>
 		<?php

@@ -7,6 +7,7 @@
  * Author: Ask Carlo
  * Author URI: https://askcarlo.com
  * Text Domain: supernetwork
+ * Network: true
  */
 
 // If this file is called directly, abort.

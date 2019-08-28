@@ -50,5 +50,23 @@ class Network extends \WP_Network
 	public function __construct( $blogs = array() )
 	{
 		$this->blogs = $blogs;
+		$this->republished = get_posts( 'meta_key=_supernetwork_share' );
+	}
+
+	/**
+	 * List all republished posts and pages
+	 *
+	 * @since
+	 */
+	public function republished()
+	{
+		if ( empty( $this->republished ) )
+		{
+			echo 'This network has no republished posts or pages!';
+			return;
+		}
+
+		foreach ( $this->republished as $post )
+			echo $post->post_name . '<br>';
 	}
 }

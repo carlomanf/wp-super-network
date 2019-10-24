@@ -44,6 +44,7 @@ class WP_Super_Network
 	{
 		// Load functions
 		add_filter( 'page_row_actions', array( $this, 'republish' ), 10, 2 );
+		add_filter( 'post_row_actions', array( $this, 'republish' ), 10, 2 );
 	}
 
 	/**

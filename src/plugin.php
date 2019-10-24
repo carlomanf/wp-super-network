@@ -56,6 +56,9 @@ class WP_Super_Network
 		if ( 'post' != $post->post_type && 'page' != $post->post_type )
 			return $actions;
 
+		if ( !is_main_site() )
+			return $actions;
+
 		if ( !empty( $_GET['republish'] ) && $post->ID === intval( $_GET['republish'] ) )
 		{
 			if ( !empty( $_GET['revoke'] ) )

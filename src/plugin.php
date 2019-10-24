@@ -61,9 +61,15 @@ class WP_Super_Network
 		if ( empty( get_post_meta( $post->ID, '_supernetwork_share' ) ) )
 			$actions['republish'] = '<a href="' . $link . '">' . __( 'Republish', 'supernetwork' ) . '</a>';
 		else
-			$actions['republish'] = '<b style="color: #555;">' . __( 'Republished', 'supernetwork' ) . '</b> <a href="' . $link . '">(' . __( 'Revoke?', 'supernetwork' ) . ')</a>';
+			$actions['republish'] = '<b style="color: #555;">' . __( 'Republished', 'supernetwork' ) . '</b> <a href="' . $link . '&revoke=1">(' . __( 'Revoke?', 'supernetwork' ) . ')</a>';
 
-		//update_post_meta( $post->ID, '_supernetwork_share', '1' );
+		if ( !empty( $_GET['republish'] ) && $post->ID === intval( $_GET['republish'] ) )
+		{
+			if ( !empty( $_GET['revoke'] ) )
+				delete_post_meta( $post->ID, '_supernetwork_share' );
+			else
+				update_post_meta( $post->ID, '_supernetwork_share', '1' );
+		}
 
 		return $actions;
 	}

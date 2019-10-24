@@ -17,7 +17,7 @@ class WP_Super_Network
 	 * Current network.
 	 *
 	 * @since 1.0.4
-	 * @var WPSN_Network
+	 * @var Network
 	 */
 	public $network;
 
@@ -31,7 +31,7 @@ class WP_Super_Network
 	{
 		if ( function_exists( 'get_network' ) )
 		{
-			$this->network = new Network( array() );
+			$this->network = new Network( get_network() );
 		}
 	}
 

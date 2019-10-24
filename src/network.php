@@ -42,21 +42,21 @@ class Network extends \WP_Network
 	 *
 	 * Constructs the network.
 	 *
-	 * @since 1.0.2
+	 * @since 1.0.4
 	 *
-	 * @param array         $blogs        Optional. Blogs to add to this network.
-	 *                                    Default empty array.
+	 * @param WP_Network
 	 */
-	public function __construct( $blogs = array() )
+	public function __construct( $network )
 	{
-		$this->blogs = $blogs;
+		$id = $network->__get( 'id' );
+		$this->blogs = get_sites( 'network_id=' . $id );
 		$this->republished = get_posts( 'meta_key=_supernetwork_share' );
 	}
 
 	/**
 	 * List all republished posts and pages
 	 *
-	 * @since
+	 * @since 1.0.4
 	 */
 	public function republished()
 	{
@@ -68,5 +68,22 @@ class Network extends \WP_Network
 
 		foreach ( $this->republished as $post )
 			echo $post->post_name . '<br>';
+	}
+
+	/**
+	 * List all blogs for current user (network admin)
+	 *
+	 * @since 1.0.4
+	 */
+	public function get_blogs_for_user()
+	{
+		if ( empty( $this->blogs ) )
+		{
+			echo 'This network has no blogs!';
+			return;
+		}
+
+		foreach ( $this->blogs as $blog )
+			echo $blog->__get( 'blogname' ) . '<br>';
 	}
 }

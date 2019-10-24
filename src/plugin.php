@@ -56,13 +56,6 @@ class WP_Super_Network
 		if ( 'post' != $post->post_type && 'page' != $post->post_type )
 			return $actions;
 
-		$link = 'page' == $post->post_type ? admin_url( 'edit.php?post_type=page&republish=' . $post->ID ) : admin_url( 'edit.php?republish=' . $post->ID );
-
-		if ( empty( get_post_meta( $post->ID, '_supernetwork_share' ) ) )
-			$actions['republish'] = '<a href="' . $link . '">' . __( 'Republish', 'supernetwork' ) . '</a>';
-		else
-			$actions['republish'] = '<b style="color: #555;">' . __( 'Republished', 'supernetwork' ) . '</b> <a href="' . $link . '&revoke=1">(' . __( 'Revoke?', 'supernetwork' ) . ')</a>';
-
 		if ( !empty( $_GET['republish'] ) && $post->ID === intval( $_GET['republish'] ) )
 		{
 			if ( !empty( $_GET['revoke'] ) )
@@ -70,6 +63,13 @@ class WP_Super_Network
 			else
 				update_post_meta( $post->ID, '_supernetwork_share', '1' );
 		}
+
+		$link = 'page' == $post->post_type ? admin_url( 'edit.php?post_type=page&republish=' . $post->ID ) : admin_url( 'edit.php?republish=' . $post->ID );
+
+		if ( empty( get_post_meta( $post->ID, '_supernetwork_share' ) ) )
+			$actions['republish'] = '<a href="' . $link . '">' . __( 'Republish', 'supernetwork' ) . '</a>';
+		else
+			$actions['republish'] = '<b style="color: #555;">' . __( 'Republished', 'supernetwork' ) . '</b> <a href="' . $link . '&revoke=1">(' . __( 'Revoke?', 'supernetwork' ) . ')</a>';
 
 		return $actions;
 	}

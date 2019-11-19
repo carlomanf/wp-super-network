@@ -45,6 +45,18 @@ class WP_Super_Network
 		// Load functions
 		add_filter( 'page_row_actions', array( $this, 'republish' ), 10, 2 );
 		add_filter( 'post_row_actions', array( $this, 'republish' ), 10, 2 );
+		add_filter( 'network_admin_menu', array( $this, 'summary' ) );
+	}
+
+	public function summary()
+	{
+		add_menu_page(
+			'WP Super Network',
+			'Super Network',
+			'create_sites',
+			'wp_super_network',
+			array( $this->network, 'page' )
+		);
 	}
 
 	/**

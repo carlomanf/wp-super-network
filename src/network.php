@@ -3,13 +3,13 @@
 /**
  * Main network class.
  */
-class Network extends \WP_Network
+class Network
 {
 	/**
 	 * Supernetwork
 	 *
 	 * @since 1.0.4
-	 * @var WPSN_Network
+	 * @var Network
 	 */
 	public $supernetwork;
 
@@ -50,7 +50,30 @@ class Network extends \WP_Network
 	{
 		$id = $network->__get( 'id' );
 		$this->blogs = get_sites( 'network_id=' . $id );
-		$this->republished = get_posts( 'meta_key=_supernetwork_share' );
+		$this->republished = array();
+
+		global $wpdb;
+		$old_wpdb = clone $wpdb;
+
+		foreach ( $this->blogs as $blog )
+		{
+			$wpdb->set_blog_id( $blog->__get( 'id' ) );
+			$newposts = get_posts( 'meta_key=_supernetwork_share' );
+			$this->republished = array_merge( $newposts, $this->republished );
+		}
+
+		$wpdb = $old_wpdb;
+	}
+
+	public function page()
+	{
+		echo '<div class="wrap">';
+		echo '<h1 class="wp-heading-inline">WP Super Network</h1>';
+		echo '<h2>Republished</h2>';
+		$this->republished();
+		echo '<h2>Blogs for User</h2>';
+		$this->get_blogs_for_user();
+		echo '</div>';
 	}
 
 	/**
@@ -84,6 +107,8 @@ class Network extends \WP_Network
 		}
 
 		foreach ( $this->blogs as $blog )
-			echo $blog->__get( 'blogname' ) . '<br>';
+		{
+			echo $blog->__get( 'blogname' ) . ' <a href="#">(Upgrade?)</a><br>';
+		}
 	}
 }

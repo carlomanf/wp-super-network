@@ -74,9 +74,9 @@ class Network
 	{
 		echo '<div class="wrap">';
 		echo '<h1 class="wp-heading-inline">WP Super Network</h1>';
-		echo '<h2>Republished</h2>';
+		echo '<h2>Republished Posts and Pages</h2>';
 		$this->republished();
-		echo '<h2>Blogs for User</h2>';
+		echo '<h2>Upgrade to Network</h2>';
 		$this->get_blogs_for_user();
 		echo '</div>';
 	}

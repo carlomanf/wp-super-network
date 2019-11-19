@@ -53,7 +53,7 @@ class Network
 		$this->republished = array();
 
 		global $wpdb;
-		$old_wpdb = clone $wpdb;
+		$old_blog_id = $wpdb->blogid;
 
 		foreach ( $this->blogs as $blog )
 		{
@@ -62,7 +62,7 @@ class Network
 			$this->republished = array_merge( $newposts, $this->republished );
 		}
 
-		$wpdb = $old_wpdb;
+		$wpdb->set_blog_id( $old_blog_id );
 	}
 
 	public function page()

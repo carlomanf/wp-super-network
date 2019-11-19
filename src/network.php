@@ -49,15 +49,20 @@ class Network
 	public function __construct( $network )
 	{
 		$id = $network->__get( 'id' );
-		$this->blogs = get_sites( 'network_id=' . $id );
+		$this->blogs = array();
 		$this->republished = array();
+
+		foreach ( get_sites( 'network_id=' . $id ) as $site )
+		{
+			array_push( $this->blogs, new Blog( $site ) );
+		}
 
 		global $wpdb;
 		$old_blog_id = $wpdb->blogid;
 
 		foreach ( $this->blogs as $blog )
 		{
-			$wpdb->set_blog_id( $blog->__get( 'id' ) );
+			$wpdb->set_blog_id( $blog->wp_site->__get( 'id' ) );
 			$newposts = get_posts( 'meta_key=_supernetwork_share' );
 			$this->republished = array_merge( $newposts, $this->republished );
 		}
@@ -108,7 +113,7 @@ class Network
 
 		foreach ( $this->blogs as $blog )
 		{
-			echo $blog->__get( 'blogname' ) . ' <a href="#">(Upgrade?)</a><br>';
+			echo $blog->wp_site->__get( 'blogname' ) . ' <a href="' . admin_url( 'network/admin.php?page=wp_super_network&upgrade=' . $blog->wp_site->__get( 'id' ) ) . '">(Upgrade?)</a><br>';
 		}
 	}
 }

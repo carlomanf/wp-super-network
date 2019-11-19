@@ -5,6 +5,13 @@
  */
 class Blog
 {
+	/**
+	 * Site object
+	 *
+	 * @since 1.0.4
+	 * @var WP_Site
+	 */
+	public $wp_site;
 
 	/**
 	 * Constructor.
@@ -13,8 +20,9 @@ class Blog
 	 *
 	 * @since 1.0.4
 	 */
-	public function __construct()
+	public function __construct( $blog )
 	{
+		$this->wp_site = $blog;
 	}
 
 	/**

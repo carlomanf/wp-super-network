@@ -1,8 +1,9 @@
-<?php namespace WP_Super_Network;
-
+<?php
 /**
  * Main network class.
  */
+namespace WP_Super_Network;
+
 class Network
 {
 	/**

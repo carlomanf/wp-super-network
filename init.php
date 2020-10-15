@@ -1,7 +1,8 @@
-<?php namespace WP_Super_Network;
+<?php
 /**
  * Initialise the plugin
  */
+namespace WP_Super_Network;
 
 // If this file is called directly, abort.
 if ( ! defined( 'WPINC' ) )

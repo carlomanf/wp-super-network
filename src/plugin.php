@@ -1,11 +1,9 @@
-<?php namespace WP_Super_Network;
-/**
- * Main plugin file
- */
-
+<?php
 /**
  * Main plugin class.
  */
+namespace WP_Super_Network;
+
 class WP_Super_Network
 {
 	/**

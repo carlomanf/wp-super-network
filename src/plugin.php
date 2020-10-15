@@ -45,6 +45,7 @@ class WP_Super_Network
 		// Load functions
 		add_filter( 'page_row_actions', array( $this, 'republish' ), 10, 2 );
 		add_filter( 'post_row_actions', array( $this, 'republish' ), 10, 2 );
+		add_filter( 'the_posts', array( $this->network, 'intercept_wp_query' ), 10, 2 );
 		add_filter( 'network_admin_menu', array( $this, 'summary' ) );
 	}
 

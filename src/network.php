@@ -116,4 +116,34 @@ class Network
 			echo $blog->wp_site->__get( 'blogname' ) . ' <a href="' . admin_url( 'network/admin.php?page=wp_super_network&upgrade=' . $blog->wp_site->__get( 'id' ) ) . '">(Upgrade?)</a><br>';
 		}
 	}
+
+	public function intercept_wp_query( $posts, $query )
+	{
+		// Prevent infinite loop
+		if ( !empty( $GLOBALS['_wp_switched_stack'] ) )
+			return $posts;
+
+		foreach ( $this->blogs as $blog )
+		{
+			$id = $blog->wp_site->__get( 'id' );
+
+			if ( $id == get_current_blog_id() )
+				continue;
+			
+			switch_to_blog( $id );
+
+			$new = new \WP_Query( $query->query );
+
+			if ($new->posts)
+			foreach ( $new->posts as $post )
+			{
+				if ( get_post_meta( $post->ID, '_supernetwork_share' ) )
+					$posts[] = $post;
+			}
+
+			restore_current_blog();
+		}
+
+		return $posts;
+	}
 }

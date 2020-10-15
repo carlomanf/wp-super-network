@@ -2,8 +2,8 @@
 Contributors: manfcarlo
 Tags: network, multisite, share, sharing
 Requires at least: 5.0
-Tested up to: 5.2
-Stable tag: 1.0.4
+Tested up to: 5.5
+Stable tag: 1.0.5
 Requires PHP: 5.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -16,7 +16,7 @@ WP Super Network is a plugin that super-charges your WordPress multisite network
 
 This plugin will enhance WordPress multisite functionality in three core ways:
 
-1. Enable identical posts and pages to be instantly republished across different sites in a network
+1. Enable posts and pages to be instantly republished across different sites in a network
 1. Enable an existing site on a network to be used as the main site for a new WordPress network
 1. Enable all sites on a network to be edited from the same admin area.
 
@@ -41,15 +41,15 @@ To flag posts and pages for republication, access the Posts or Pages screen in W
 
 = How do I republish a page to the whole network? =
 
-This feature is still under development. As of version 1.0.4, you can flag any post or page on a main site for republication by finding it on the Posts or Pages screen and clicking Republish.
+This feature is still under development. As of version 1.0.5, you can flag any post or page on a main site for republication by finding it on the Posts or Pages screen and clicking Republish.
 
 After you have republished the post or page, you can access the network admin and click on Super Network. You will see a list of all posts and pages across all sites in the network that have been flagged for republication.
 
 To revoke republication, just click on Revoke in the same place where you republished the post or page.
 
-= Why can't I republish my post? =
+= Why do my republished posts not render properly, or not at all? =
 
-If you can't see anywhere to click to republish your post, it might be because it is the wrong post type or because you are not on a main site. Currently, this plugin only allows you to flag a post or page for republication and only from the main site of a network.
+This feature is still under development. Some fields of a republished posts may render incorrectly or not at all when viewed from another site on the network. If this causes problems, you can revoke the republication of the post according to the instructions above.
 
 = How do I turn an existing site into the main site for a new network? =
 
@@ -64,6 +64,11 @@ This feature is still to come.
 Through the WordPress support forum, or on the [GitHub page here.](https://github.com/carlomanf/wp-super-network/issues)
 
 == Changelog ==
+
+= 1.0.5 =
+* Enable all post types to be republished
+* Start republishing posts across the network
+* Correct permalinks for republished posts and CPT's
 
 = 1.0.4 =
 * Add readme for wordpress plugin directory

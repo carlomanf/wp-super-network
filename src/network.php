@@ -30,14 +30,6 @@ class Network
 	public $blogs;
 
 	/**
-	 * Republished posts and pages for this network
-	 *
-	 * @since 1.0.4
-	 * @var array
-	 */
-	public $republished;
-
-	/**
 	 * Constructor.
 	 *
 	 * Constructs the network.
@@ -50,24 +42,11 @@ class Network
 	{
 		$id = $network->__get( 'id' );
 		$this->blogs = array();
-		$this->republished = array();
 
 		foreach ( get_sites( 'network_id=' . $id ) as $site )
 		{
 			array_push( $this->blogs, new Blog( $site ) );
 		}
-
-		global $wpdb;
-		$old_blog_id = $wpdb->blogid;
-
-		foreach ( $this->blogs as $blog )
-		{
-			$wpdb->set_blog_id( $blog->wp_site->__get( 'id' ) );
-			$newposts = get_posts( 'meta_key=_supernetwork_share' );
-			$this->republished = array_merge( $newposts, $this->republished );
-		}
-
-		$wpdb->set_blog_id( $old_blog_id );
 	}
 
 	public function page()
@@ -88,14 +67,16 @@ class Network
 	 */
 	public function republished()
 	{
-		if ( empty( $this->republished ) )
+		$republished = get_posts( 'meta_key=_supernetwork_share&suppress_filters=0&post_type=any' );
+
+		if ( empty( $republished ) )
 		{
 			echo 'This network has no republished posts or pages!';
 			return;
 		}
 
-		foreach ( $this->republished as $post )
-			echo $post->post_name . '<br>';
+		foreach ( $republished as $post )
+			echo '<a href="' . get_permalink( $post ) . '">' . $post->post_title . '</a><br>';
 	}
 
 	/**

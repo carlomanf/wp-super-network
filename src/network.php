@@ -146,4 +146,37 @@ class Network
 
 		return $posts;
 	}
+
+	public function intercept_permalink( $permalink, $the_post )
+	{
+		// Prevent infinite loop
+		if ( !empty( $GLOBALS['_wp_switched_stack'] ) )
+			return $permalink;
+		
+		foreach ( $this->blogs as $blog )
+		{
+			switch_to_blog( $blog->wp_site->__get( 'id' ) );
+
+			// Try the post with the same ID on each site
+			// and check if its guid matches
+			wp_cache_flush();
+			$a_post = get_post( $the_post->ID );
+
+			if ( empty( $a_post ) || $the_post->guid != $a_post->guid )
+			{
+				// Couldn't find the post, or the guid didn't match
+				restore_current_blog();
+				continue;
+			}
+			else
+			{
+				// Correct site was found
+				$permalink = get_permalink( $a_post );
+				restore_current_blog();
+				return $permalink;
+			}
+		}
+
+		return '#';
+	}
 }

@@ -41,6 +41,7 @@ class WP_Super_Network
 	public function run()
 	{
 		// Load functions
+		add_filter( 'admin_init', array( $this, 'update_db' ) );
 		add_filter( 'page_row_actions', array( $this, 'republish' ), 10, 2 );
 		add_filter( 'post_row_actions', array( $this, 'republish' ), 10, 2 );
 		add_filter( 'the_posts', array( $this->network, 'intercept_wp_query' ), 10, 2 );
@@ -60,32 +61,43 @@ class WP_Super_Network
 		);
 	}
 
+	public function update_db()
+	{
+		if ( empty( $_GET['republish'] ) )
+			return;
+
+		$post = get_post( intval( $_GET['republish'] ) );
+
+		if ( empty( $post ) || !current_user_can( 'edit_post', $post->ID ) )
+			return;
+
+		if ( empty( $_GET['revoke'] ) )
+			update_post_meta( $post->ID, '_supernetwork_share', '1' );
+		else
+			delete_post_meta( $post->ID, '_supernetwork_share' );
+	}
+
 	/**
 	 * Add a link to republish
 	 *
 	 * @since 1.0.4
 	 */
-	public function republish( $actions, $post ) {
-		if ( 'post' != $post->post_type && 'page' != $post->post_type )
-			return $actions;
+	public function republish( $actions, $post )
+	{
+		$link = 'post' == $post->post_type ? admin_url( 'edit.php?republish=' . $post->ID ) : admin_url( 'edit.php?post_type=' . $post->post_type . '&republish=' . $post->ID );
+		$post2 = get_post( $post->ID );
 
-		if ( !is_main_site() )
-			return $actions;
-
-		if ( !empty( $_GET['republish'] ) && $post->ID === intval( $_GET['republish'] ) )
+		if ( empty( $post2 ) || $post2->guid !== $post->guid )
 		{
-			if ( !empty( $_GET['revoke'] ) )
-				delete_post_meta( $post->ID, '_supernetwork_share' );
-			else
-				update_post_meta( $post->ID, '_supernetwork_share', '1' );
+			$actions['republish'] = '<b style="color: #555;">' . __( 'Republished', 'supernetwork' ) . '</b>';
 		}
-
-		$link = 'page' == $post->post_type ? admin_url( 'edit.php?post_type=page&republish=' . $post->ID ) : admin_url( 'edit.php?republish=' . $post->ID );
-
-		if ( empty( get_post_meta( $post->ID, '_supernetwork_share' ) ) )
-			$actions['republish'] = '<a href="' . $link . '">' . __( 'Republish', 'supernetwork' ) . '</a>';
 		else
-			$actions['republish'] = '<b style="color: #555;">' . __( 'Republished', 'supernetwork' ) . '</b> <a href="' . $link . '&revoke=1">(' . __( 'Revoke?', 'supernetwork' ) . ')</a>';
+		{
+			if ( get_post_meta( $post->ID, '_supernetwork_share' ) )
+				$actions['republish'] = '<b style="color: #555;">' . __( 'Republished', 'supernetwork' ) . '</b> <a href="' . $link . '&revoke=1">(' . __( 'Revoke?', 'supernetwork' ) . ')</a>';
+			else
+				$actions['republish'] = '<a href="' . $link . '">' . __( 'Republish', 'supernetwork' ) . '</a>';
+		}
 
 		return $actions;
 	}

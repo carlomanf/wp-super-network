@@ -17,7 +17,7 @@ class WP_Super_Network
 	 * @since 1.0.4
 	 * @var Network
 	 */
-	public $network;
+	private $network;
 
 	/**
 	 * Instantiate a WP_Super_Network object.
@@ -31,6 +31,17 @@ class WP_Super_Network
 		{
 			$this->network = new Network( get_network() );
 		}
+	}
+
+	/**
+	 * Return current network.
+	 *
+	 * @since 1.0.6
+	 * @return Network
+	 */
+	public function network()
+	{
+		return $this->network;
 	}
 
 	/**

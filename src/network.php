@@ -12,7 +12,7 @@ class Network
 	 * @since 1.0.4
 	 * @var Network
 	 */
-	public $supernetwork;
+	private $supernetwork;
 
 	/**
 	 * Subnetworks
@@ -20,7 +20,7 @@ class Network
 	 * @since 1.0.4
 	 * @var array
 	 */
-	public $subnetworks;
+	private $subnetworks;
 
 	/**
 	 * Blogs in the network.
@@ -28,7 +28,15 @@ class Network
 	 * @since 1.0.4
 	 * @var array
 	 */
-	public $blogs;
+	private $blogs;
+
+	/**
+	 * Is this network on consolidated mode.
+	 *
+	 * @since 1.0.6
+	 * @var bool
+	 */
+	private $consolidated;
 
 	/**
 	 * Constructor.
@@ -48,6 +56,8 @@ class Network
 		{
 			array_push( $this->blogs, new Blog( $site ) );
 		}
+
+		$this->consolidated = false;
 	}
 
 	public function page()
@@ -68,7 +78,7 @@ class Network
 	 */
 	public function republished()
 	{
-		$republished = get_posts( 'meta_key=_supernetwork_share&suppress_filters=0&post_type=any' );
+		$republished = $this->consolidate( 'meta_key=_supernetwork_share&post_type=any' );
 
 		if ( empty( $republished ) )
 		{
@@ -78,6 +88,24 @@ class Network
 
 		foreach ( $republished as $post )
 			echo '<a href="' . get_permalink( $post ) . '">' . $post->post_title . '</a><br>';
+	}
+
+	/**
+	 * Perform a query in ad-hoc consolidated mode
+	 *
+	 * @since 1.0.6
+	 */
+	public function consolidate( $args )
+	{
+		$old = $this->consolidated;
+
+		// Turn on consolidated mode temporarily
+		$this->consolidated = true;
+		$query = new \WP_Query( $args );
+
+		$this->consolidated = $old;
+
+		return $query->posts;
 	}
 
 	/**
@@ -99,8 +127,18 @@ class Network
 		}
 	}
 
+	/**
+	 * Intercepts WP_Query to return posts from across the network.
+	 * Only takes effect when consolidated mode is on.
+	 *
+	 * @since 1.0.5
+	 */
 	public function intercept_wp_query( $posts, $query )
 	{
+		// Turn off this filter if not allowed
+		if ( !$this->consolidated )
+			return $posts;
+
 		// Prevent infinite loop
 		if ( !empty( $GLOBALS['_wp_switched_stack'] ) )
 			return $posts;

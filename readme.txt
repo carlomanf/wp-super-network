@@ -3,7 +3,7 @@ Contributors: manfcarlo
 Tags: network, multisite, share, sharing
 Requires at least: 5.0
 Tested up to: 5.5
-Stable tag: 1.0.6
+Stable tag: 1.0.7
 Requires PHP: 5.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -64,6 +64,10 @@ This feature is still to come.
 Through the WordPress support forum, or on the [GitHub page here.](https://github.com/carlomanf/wp-super-network/issues)
 
 == Changelog ==
+
+= 1.0.7 =
+* New settings API
+* Import options values from main site
 
 = 1.0.6 =
 * Only republish posts when consolidated mode is on

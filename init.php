@@ -21,9 +21,12 @@ if ( ! defined( 'SUPER_NETWORK_URL' ) )
 }
 
 // Load classes.
-require SUPER_NETWORK_DIR . '/src/blog.php';
-require SUPER_NETWORK_DIR . '/src/network.php';
-require SUPER_NETWORK_DIR . '/src/plugin.php';
+require SUPER_NETWORK_DIR . 'src/blog.php';
+require SUPER_NETWORK_DIR . 'src/field.php';
+require SUPER_NETWORK_DIR . 'src/network.php';
+require SUPER_NETWORK_DIR . 'src/page.php';
+require SUPER_NETWORK_DIR . 'src/plugin.php';
+require SUPER_NETWORK_DIR . 'src/section.php';
 
 // Initialize the plugin.
 $GLOBALS['supernetwork'] = new WP_Super_Network();

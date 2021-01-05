@@ -44,6 +44,18 @@ class WP_Super_Network
 		return $this->network;
 	}
 
+	function options( $value, $option )
+	{
+		if ( !is_main_site() )
+		{
+			switch_to_blog( get_main_site_id() );
+			$value = get_option( $option );
+			restore_current_blog();
+		}
+
+		return $value;
+	}
+
 	/**
 	 * Launch the initialization process.
 	 *
@@ -59,6 +71,16 @@ class WP_Super_Network
 		add_filter( 'post_type_link', array( $this->network, 'intercept_permalink' ), 10, 2 );
 		add_filter( 'post_link', array( $this->network, 'intercept_permalink' ), 10, 2 );
 		add_filter( 'network_admin_menu', array( $this, 'summary' ) );
+
+		if ( is_main_site() ) $this->network->register_pages();
+
+		foreach ( get_option( 'supernetwork_options' ) as $option => $val )
+		{
+			if ( $val || $option === 'supernetwork_options' )
+			{
+				add_filter( 'pre_option_' . $option, array( $this, 'options' ), 10, 2 );
+			}
+		}
 	}
 
 	public function summary()

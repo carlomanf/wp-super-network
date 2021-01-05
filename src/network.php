@@ -39,6 +39,14 @@ class Network
 	private $consolidated;
 
 	/**
+	 * Settings page.
+	 *
+	 * @since 1.0.7
+	 * @var Settings_Page
+	 */
+	private $page;
+
+	/**
 	 * Constructor.
 	 *
 	 * Constructs the network.
@@ -58,6 +66,47 @@ class Network
 		}
 
 		$this->consolidated = false;
+
+		$this->page = new Settings_Page(
+			'supernetwork_options',
+			'Network Settings',
+			'Network',
+			'manage_network_options',
+			'supernetwork_options',
+			'<p>Network settings.</p>',
+			10,
+			'options-general.php'
+		);
+
+		$section = new Settings_Section(
+			'options',
+			'Options'
+		);
+
+		global $wpdb;
+		$results = $wpdb->get_results( "select distinct option_name from $wpdb->options where option_name not like '\_%' and option_name <> 'supernetwork_options' order by option_name" );
+		$labels = array();
+
+		foreach ( $results as $result )
+		{
+			$labels[ $result->option_name ] = $result->option_name;
+		}
+
+		$field = new Settings_Field(
+			'supernetwork_options',
+			'%s',
+			'checkbox',
+			'Defer to Network',
+			$labels
+		);
+
+		$section->add( $field );
+		$this->page->add( $section );
+	}
+
+	public function register_pages()
+	{
+		$this->page->register();
 	}
 
 	public function page()

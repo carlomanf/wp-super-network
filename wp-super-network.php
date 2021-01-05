@@ -3,7 +3,7 @@
  * Plugin Name: WP Super Network
  * Plugin URI:
  * Description: Share content between sites and create offspring networks.
- * Version: 1.0.7
+ * Version: 1.0.8
  * Author: Ask Carlo
  * Author URI: https://askcarlo.com
  * Text Domain: supernetwork

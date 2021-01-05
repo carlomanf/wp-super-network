@@ -74,9 +74,12 @@ class WP_Super_Network
 
 		if ( is_main_site() ) $this->network->register_pages();
 
+		// Complete this before accessing the option on next line
+		add_filter( 'pre_option_supernetwork_options', array( $this, 'options' ), 10, 2 );
+		
 		foreach ( get_option( 'supernetwork_options' ) as $option => $val )
 		{
-			if ( $val || $option === 'supernetwork_options' )
+			if ( $val )
 			{
 				add_filter( 'pre_option_' . $option, array( $this, 'options' ), 10, 2 );
 			}

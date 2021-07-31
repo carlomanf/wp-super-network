@@ -77,7 +77,7 @@ class WP_Super_Network
 		// Complete this before accessing the option on next line
 		add_filter( 'pre_option_supernetwork_options', array( $this, 'options' ), 10, 2 );
 		
-		foreach ( get_option( 'supernetwork_options' ) as $option => $val )
+		foreach ( (array) get_option( 'supernetwork_options' ) as $option => $val )
 		{
 			if ( $val )
 			{

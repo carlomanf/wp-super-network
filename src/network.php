@@ -68,7 +68,7 @@ class Network
 		$this->consolidated = false;
 
 		$this->page = new Settings_Page(
-			'supernetwork_options',
+			array( 'supernetwork_options', 'supernetwork_post_types', 'supernetwork_consolidated' ),
 			'Network Settings',
 			'Network',
 			'manage_network_options',
@@ -100,8 +100,40 @@ class Network
 			$labels
 		);
 
+		$section2 = new Settings_Section(
+			'post_types',
+			'Post Types'
+		);
+
+		$labels2 = array();
+
+		$field2 = new Settings_Field(
+			'supernetwork_post_types',
+			'%s',
+			'checkbox',
+			'Defer to Network',
+			$labels2
+		);
+
+		$section3 = new Settings_Section(
+			'consolidated',
+			'Consolidated Mode'
+		);
+
+		$field3 = new Settings_Field(
+			'supernetwork_consolidated',
+			'consolidated',
+			'checkbox',
+			'Consolidated Mode',
+			'Turn on consolidated mode?'
+		);
+
 		$section->add( $field );
+		$section2->add( $field2 );
+		$section3->add( $field3 );
 		$this->page->add( $section );
+		$this->page->add( $section2 );
+		$this->page->add( $section3 );
 	}
 
 	public function register_pages()

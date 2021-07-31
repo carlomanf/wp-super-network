@@ -18,7 +18,7 @@ class Settings_Page
 
 	public function __construct( $database, $title, $menu, $capability, $slug, $description, $priority = 10, $submenu = false )
 	{
-		$this->database = $database;
+		$this->database = is_string( $database ) ? array( $database ) : $database;
 		$this->title = $title;
 		$this->menu = $menu;
 		$this->capability = $capability;
@@ -62,9 +62,6 @@ class Settings_Page
 
 	public function init()
 	{
-		if ( false === get_option( $this->database ) )
-			add_option( $this->database, '' );
-
 		foreach ( $this->sections as $section )
 		{
 			add_settings_section(
@@ -95,7 +92,8 @@ class Settings_Page
 			}
 		}
 	
-		register_setting( $this->slug, $this->database );
+		foreach ( $this->database as $database )
+		register_setting( $this->slug, $database );
 	}
 
 	public function menu()

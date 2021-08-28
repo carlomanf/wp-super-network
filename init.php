@@ -20,13 +20,16 @@ if ( ! defined( 'SUPER_NETWORK_URL' ) )
 	define( 'SUPER_NETWORK_URL', plugin_dir_url( __FILE__ ) );
 }
 
+// Load libraries.
+require_once SUPER_NETWORK_DIR . 'vendor/autoload.php';
+
 // Load classes.
-require SUPER_NETWORK_DIR . 'src/blog.php';
-require SUPER_NETWORK_DIR . 'src/field.php';
-require SUPER_NETWORK_DIR . 'src/network.php';
-require SUPER_NETWORK_DIR . 'src/page.php';
-require SUPER_NETWORK_DIR . 'src/plugin.php';
-require SUPER_NETWORK_DIR . 'src/section.php';
+require_once SUPER_NETWORK_DIR . 'src/blog.php';
+require_once SUPER_NETWORK_DIR . 'src/field.php';
+require_once SUPER_NETWORK_DIR . 'src/network.php';
+require_once SUPER_NETWORK_DIR . 'src/page.php';
+require_once SUPER_NETWORK_DIR . 'src/plugin.php';
+require_once SUPER_NETWORK_DIR . 'src/section.php';
 
 // Initialize the plugin.
 $GLOBALS['supernetwork'] = new WP_Super_Network();

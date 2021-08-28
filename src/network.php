@@ -46,6 +46,9 @@ class Network
 	 */
 	private $page;
 
+	private $parser;
+	private $creator;
+
 	/**
 	 * Constructor.
 	 *
@@ -65,7 +68,22 @@ class Network
 			array_push( $this->blogs, new Blog( $site ) );
 		}
 
-		$this->consolidated = false;
+		$this->posts = array();
+		foreach ( $this->blogs as $blog )
+		{
+			$query = 'select * from ' . $GLOBALS['wpdb']->base_prefix;
+			if ( $blog->id > 1 ) $query .= $blog->id . '_';
+			$query .= 'posts';
+
+			$this->posts[] = $query;
+		}
+
+		$this->posts = implode( ' union ', $this->posts );
+
+		$this->parser = new \PHPSQLParser\PHPSQLParser();
+		$this->creator = new \PHPSQLParser\PHPSQLCreator();
+
+		$this->consolidated = true;
 
 		$this->page = new Settings_Page(
 			array( 'supernetwork_options', 'supernetwork_post_types', 'supernetwork_consolidated' ),
@@ -208,44 +226,26 @@ class Network
 		}
 	}
 
-	/**
-	 * Intercepts WP_Query to return posts from across the network.
-	 * Only takes effect when consolidated mode is on.
-	 *
-	 * @since 1.0.5
-	 */
-	public function intercept_wp_query( $posts, $query )
+	public function intercept_query( $query )
 	{
-		// Turn off this filter if not allowed
-		if ( !$this->consolidated )
-			return $posts;
+		$parsed = $this->parser->parse( $query );
 
-		// Prevent infinite loop
-		if ( !empty( $GLOBALS['_wp_switched_stack'] ) )
-			return $posts;
-
-		foreach ( $this->blogs as $blog )
+		if ( isset( $parsed['SELECT'] ) && isset( $parsed['FROM'] ) )
 		{
-			$id = $blog->wp_site->__get( 'id' );
-
-			if ( $id == get_current_blog_id() )
-				continue;
-			
-			switch_to_blog( $id );
-
-			$new = new \WP_Query( $query->query );
-
-			if ($new->posts)
-			foreach ( $new->posts as $post )
+			foreach ( $parsed['FROM'] as &$from )
 			{
-				if ( get_post_meta( $post->ID, '_supernetwork_share' ) )
-					$posts[] = $post;
-			}
+				if ( isset( $from['table'] ) && $from['table'] === $GLOBALS['wpdb']->posts )
+				{
+					$from = $this->parser->parse(
+						'select * from (' . $this->posts . ') ' . $GLOBALS['wpdb']->posts
+					)['FROM'][0];
 
-			restore_current_blog();
+					$query = $this->creator->create( $parsed );
+				}
+			}
 		}
 
-		return $posts;
+		return $query;
 	}
 
 	public function intercept_permalink( $permalink, $the_post )

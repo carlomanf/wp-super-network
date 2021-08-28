@@ -1,0 +1,5 @@
+{
+    "require": {
+        "greenlion/php-sql-parser": "^4.4"
+    }
+}

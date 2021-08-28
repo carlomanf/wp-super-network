@@ -26,6 +26,14 @@ class Blog
 		$this->wp_site = $blog;
 	}
 
+	public function __get( $key )
+	{
+		if ( $key === 'id' )
+		{
+			return $this->wp_site->blog_id;
+		}
+	}
+
 	/**
 	 * Pop blog out of its network and create a new network.
 	 *

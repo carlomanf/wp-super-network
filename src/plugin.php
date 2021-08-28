@@ -67,9 +67,9 @@ class WP_Super_Network
 		add_filter( 'admin_init', array( $this, 'update_db' ) );
 		add_filter( 'page_row_actions', array( $this, 'republish' ), 10, 2 );
 		add_filter( 'post_row_actions', array( $this, 'republish' ), 10, 2 );
-		add_filter( 'the_posts', array( $this->network, 'intercept_wp_query' ), 10, 2 );
 		add_filter( 'post_type_link', array( $this->network, 'intercept_permalink' ), 10, 2 );
 		add_filter( 'post_link', array( $this->network, 'intercept_permalink' ), 10, 2 );
+		add_filter( 'query', array( $this->network, 'intercept_query' ), 10, 2 );
 		add_filter( 'network_admin_menu', array( $this, 'summary' ) );
 
 		if ( is_main_site() ) $this->network->register_pages();

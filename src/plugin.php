@@ -76,10 +76,12 @@ class WP_Super_Network
 
 		// Complete this before accessing the option on next line
 		add_filter( 'pre_option_supernetwork_options', array( $this, 'options' ), 10, 2 );
+		add_filter( 'pre_option_supernetwork_post_types', array( $this, 'options' ), 10, 2 );
+		add_filter( 'pre_option_supernetwork_consolidated', array( $this, 'options' ), 10, 2 );
 		
 		foreach ( (array) get_option( 'supernetwork_options' ) as $option => $val )
 		{
-			if ( $val )
+			if ( $val && strpos( $option, '_' ) !== 0 && strpos( $option, 'supernetwork_' ) !== 0 )
 			{
 				add_filter( 'pre_option_' . $option, array( $this, 'options' ), 10, 2 );
 			}

@@ -140,7 +140,7 @@ class Network
 		);
 
 		global $wpdb;
-		$results = $wpdb->get_results( "select distinct option_name from $wpdb->options where option_name not like '\_%' and option_name <> 'supernetwork_options' order by option_name" );
+		$results = $wpdb->get_results( "select distinct option_name from $wpdb->options where option_name not like '\_%' and option_name not like 'supernetwork\_%' order by option_name" );
 		$labels = array();
 
 		foreach ( $results as $result )
@@ -161,14 +161,14 @@ class Network
 			'Post Types'
 		);
 
-		$labels2 = array();
+		add_filter( 'supernetwork_settings_field_args', array( $this, 'post_types' ), 10, 2 );
 
 		$field2 = new Settings_Field(
 			'supernetwork_post_types',
 			'%s',
 			'checkbox',
 			'Defer to Network',
-			$labels2
+			array()
 		);
 
 		$section3 = new Settings_Section(
@@ -190,6 +190,19 @@ class Network
 		$this->page->add( $section );
 		$this->page->add( $section2 );
 		$this->page->add( $section3 );
+	}
+
+	public function post_types( $args, $field )
+	{
+		if ( $field->database() === 'supernetwork_post_types' )
+		{
+			foreach ( get_post_types() as $type )
+			{
+				$args['labels'][ $type ] = $type;
+			}
+		}
+
+		return $args;
 	}
 
 	public function register_pages()

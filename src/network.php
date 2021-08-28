@@ -49,6 +49,53 @@ class Network
 	private $parser;
 	private $creator;
 
+	private function union( $table )
+	{
+		$tables = array();
+		foreach ( $this->blogs as $blog )
+		{
+			$query = 'select * from ' . $GLOBALS['wpdb']->base_prefix;
+			if ( $blog->id > 1 ) $query .= $blog->id . '_';
+			$query .= $table;
+
+			$tables[] = $query;
+		}
+
+		return implode( ' union ', $tables );
+	}
+
+	private function remove_collisions( &$parsed, $col )
+	{
+		$parsed['WHERE'] = isset( $parsed['WHERE'] ) ? array(
+			array(
+				'expr_type' => 'bracket_expression',
+				'sub_tree' => $parsed['WHERE']
+			)
+		) : array();
+
+		$parsed['WHERE'][] = array(
+			'expr_type' => 'operator',
+			'base_expr' => 'and'
+		);
+
+		$parsed['WHERE'][] = array(
+			'expr_type' => 'bracket_expression',
+			'sub_tree' => $this->parser->parse(
+				'where ' . $col . ' not in (' . implode( ', ', $this->collisions ) . ')'
+			)['WHERE']
+		);
+
+		return $parsed;
+	}
+
+	public function report_collisions()
+	{
+		if ( !empty( $this->collisions ) )
+		{
+			echo '<div class="notice notice-error"><p><strong>WP Super Network detected ' . count( $this->collisions ) . ' post ID collisions</strong> across your network! These posts have been temporarily hidden. To access them again, please turn off consolidated mode.</p></div>';
+		}
+	}
+
 	/**
 	 * Constructor.
 	 *
@@ -68,17 +115,8 @@ class Network
 			array_push( $this->blogs, new Blog( $site ) );
 		}
 
-		$this->posts = array();
-		foreach ( $this->blogs as $blog )
-		{
-			$query = 'select * from ' . $GLOBALS['wpdb']->base_prefix;
-			if ( $blog->id > 1 ) $query .= $blog->id . '_';
-			$query .= 'posts';
-
-			$this->posts[] = $query;
-		}
-
-		$this->posts = implode( ' union ', $this->posts );
+		$this->collisions = $GLOBALS['wpdb']->get_col( 'select ID from (' . $this->union( 'posts' ) . ') posts group by ID having count(*) > 1' );
+		add_filter( 'admin_footer', array( $this, 'report_collisions' ) );
 
 		$this->parser = new \PHPSQLParser\PHPSQLParser();
 		$this->creator = new \PHPSQLParser\PHPSQLCreator();
@@ -237,10 +275,23 @@ class Network
 				if ( isset( $from['table'] ) && $from['table'] === $GLOBALS['wpdb']->posts )
 				{
 					$from = $this->parser->parse(
-						'select * from (' . $this->posts . ') ' . $GLOBALS['wpdb']->posts
+						'from (' . $this->union( 'posts' ) . ') ' . $GLOBALS['wpdb']->posts
 					)['FROM'][0];
 
-					$query = $this->creator->create( $parsed );
+					$this->remove_collisions( $parsed, 'ID' );
+
+					return $this->creator->create( $parsed );
+				}
+				
+				if ( isset( $from['table'] ) && $from['table'] === $GLOBALS['wpdb']->postmeta )
+				{
+					$from = $this->parser->parse(
+						'from (' . $this->union( 'postmeta' ) . ') ' . $GLOBALS['wpdb']->postmeta
+					)['FROM'][0];
+
+					$this->remove_collisions( $parsed, 'post_id' );
+					
+					return $this->creator->create( $parsed );
 				}
 			}
 		}

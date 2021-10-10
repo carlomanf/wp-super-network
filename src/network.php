@@ -85,11 +85,14 @@ class Network
 		$tables = array();
 		foreach ( $this->blogs as $blog )
 		{
-			$query = 'select * from ' . $GLOBALS['wpdb']->base_prefix;
-			if ( $blog->id > 1 ) $query .= $blog->id . '_';
-			$query .= $table;
-
-			$tables[] = $query;
+			$where = '';
+			
+			if ( $table === 'posts' && !$blog->is_network() )
+			{
+				$where = ' where post_type not in (\'' . implode( '\', \'', array_keys( (array) get_option( 'supernetwork_post_types' ) ) ) . '\')';
+			}
+			
+			$tables[] = 'select * from ' . $blog->table( $table ) . $where;
 		}
 
 		return implode( ' union ', $tables );
@@ -166,7 +169,8 @@ class Network
 
 		$section = new Settings_Section(
 			'options',
-			'Options'
+			'Options',
+			'This setting only takes effect when consolidated mode is turned on.'
 		);
 
 		global $wpdb;
@@ -188,7 +192,8 @@ class Network
 
 		$section2 = new Settings_Section(
 			'post_types',
-			'Post Types'
+			'Post Types',
+			'This setting only takes effect when consolidated mode is turned on.'
 		);
 
 		add_filter( 'supernetwork_settings_field_args', array( $this, 'post_types' ), 10, 2 );
@@ -218,9 +223,9 @@ class Network
 		$section->add( $field );
 		$section2->add( $field2 );
 		$section3->add( $field3 );
-		$this->page->add( $section );
-		$this->page->add( $section2 );
 		$this->page->add( $section3 );
+		$this->page->add( $section2 );
+		$this->page->add( $section );
 	}
 
 	public function post_types( $args, $field )

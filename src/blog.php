@@ -32,6 +32,11 @@ class Blog
 		{
 			return $this->wp_site->blog_id;
 		}
+		
+		if ( $key === 'network_id' )
+		{
+			return $this->wp_site->site_id;
+		}
 	}
 	
 	public function table( $name )
@@ -41,6 +46,11 @@ class Blog
 		if ( $id > 1 ) $table .= $id . '_';
 		$table .= $name;
 		return $table;
+	}
+
+	public function is_network()
+	{
+		return is_main_site( $this->__get( 'id' ), $this->__get( 'network_id' ) );
 	}
 
 	/**

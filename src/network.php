@@ -51,6 +51,17 @@ class Network
 
 	private $collisions;
 
+	public function shared_auto_increment( $post_ID, $post, $update )
+	{
+		if ( !$update )
+		{
+			foreach ( $this->blogs as $blog )
+			{
+				$GLOBALS['wpdb']->query( 'alter table ' . $blog->table( 'posts' ) . ' auto_increment = ' . (string) ($post_ID + 1) );
+			}
+		}
+	}
+
 	public function __set( $key, $value )
 	{
 		if ( $key = 'consolidated' )

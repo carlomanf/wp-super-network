@@ -49,6 +49,26 @@ class Network
 	private $parser;
 	private $creator;
 
+	private $collisions;
+
+	public function __set( $key, $value )
+	{
+		if ( $key = 'consolidated' )
+		{
+			if ( $value === true )
+			{
+				$this->collisions = $GLOBALS['wpdb']->get_col( 'select ID from (' . $this->union( 'posts' ) . ') posts group by ID having count(*) > 1' );
+				$this->consolidated = true;
+			}
+			
+			if ( $value === false )
+			{
+				$this->collisions = array();
+				$this->consolidated = false;
+			}
+		}
+	}
+
 	private function union( $table )
 	{
 		$tables = array();
@@ -90,7 +110,7 @@ class Network
 
 	public function report_collisions()
 	{
-		if ( !empty( $this->collisions ) )
+		if ( $this->consolidated && !empty( $this->collisions ) )
 		{
 			echo '<div class="notice notice-error"><p><strong>WP Super Network detected ' . count( $this->collisions ) . ' post ID collisions</strong> across your network! These posts have been temporarily hidden. To access them again, please turn off consolidated mode.</p></div>';
 		}
@@ -115,13 +135,12 @@ class Network
 			array_push( $this->blogs, new Blog( $site ) );
 		}
 
-		$this->collisions = $GLOBALS['wpdb']->get_col( 'select ID from (' . $this->union( 'posts' ) . ') posts group by ID having count(*) > 1' );
 		add_filter( 'admin_footer', array( $this, 'report_collisions' ) );
 
 		$this->parser = new \PHPSQLParser\PHPSQLParser();
 		$this->creator = new \PHPSQLParser\PHPSQLCreator();
 
-		$this->consolidated = true;
+		$this->__set( 'consolidated', false );
 
 		$this->page = new Settings_Page(
 			array( 'supernetwork_options', 'supernetwork_post_types', 'supernetwork_consolidated' ),
@@ -181,7 +200,8 @@ class Network
 			'consolidated',
 			'checkbox',
 			'Consolidated Mode',
-			'Turn on consolidated mode?'
+			'Turn on consolidated mode?',
+			'<strong>Warning:</strong> Consolidated mode is highly unstable. It is strongly suggested that you have a REGULAR backup regime in place for your database, before activating consolidated mode.'
 		);
 
 		$section->add( $field );
@@ -214,8 +234,62 @@ class Network
 	{
 		echo '<div class="wrap">';
 		echo '<h1 class="wp-heading-inline">WP Super Network</h1>';
-		echo '<h2>Republished Posts and Pages</h2>';
-		$this->republished();
+
+		if ( $this->consolidated )
+		{
+			echo '<h2>Post ID Collisions</h2>';
+			echo '<p>Consolidated mode is designed for fresh networks. When activated on an existing network, a large number of ID collisions are inevitable. However, you may be able to eliminate some collisions when the ID refers to a post of low importance, such as a revision or autosave.</p>';
+			echo '<p>The below table allows you to eliminate post ID collisions, one ID at a time. For each ID, you must select just ONE post to keep. All others with the same ID will be immediately and irretrievably deleted.</p>';
+	
+			echo '<form method="post" action="">';
+			echo '<table class="widefat">';
+			echo '<thead><tr><th scope="col">Keep?</th><th scope="col">GUID</th><th scope="col">Post Title</th><th scope="col">Post Preview</th><th scope="col">Post Type</th><th scope="col">Post Status</th></tr></thead>';
+			echo '<tbody>';
+
+			$id = min( $this->collisions );
+
+			if ( isset( $_POST['supernetwork_post_collision_' . $id ] ) )
+			{
+				$this->__set( 'consolidated', false );
+				
+				foreach ( $this->blogs as $blog )
+				{
+					switch_to_blog( $blog->id );
+					
+					if ( empty( $GLOBALS['wpdb']->get_col( 'select ID from ' . $blog->table( 'posts' ) . ' where guid = \'' . $_POST['supernetwork_post_collision_' . $id ] . '\' limit 1' ) ) )
+					{
+						wp_delete_post( (int) $id, true );
+					}
+
+					restore_current_blog();
+				}
+
+				$this->__set( 'consolidated', true );
+				$id = min( $this->collisions );
+			}
+			
+			foreach ( $GLOBALS['wpdb']->get_results( 'select guid, post_title, substring(post_content, 1, 500) as post_preview, post_type, post_status from (' . $this->union( 'posts' ) . ') posts where ID = ' . $id, ARRAY_A ) as $site )
+			{
+				echo '<tr>';
+				echo '<td><input type="radio" id="supernetwork__' . esc_textarea( $site['guid'] ) . '" value="' . esc_textarea( $site['guid'] ) . '" name="supernetwork_post_collision_' . $id . '"></td>';
+				echo '<td><label for="supernetwork__' . esc_textarea( $site['guid'] ) . '">' . esc_textarea( $site['guid'] ) . '</label></td>';
+				echo '<td><label for="supernetwork__' . esc_textarea( $site['guid'] ) . '">' . esc_textarea( $site['post_title'] ) . '</label></td>';
+				echo '<td><label for="supernetwork__' . esc_textarea( $site['guid'] ) . '">' . esc_textarea( $site['post_preview'] ) . '</label></td>';
+				echo '<td><label for="supernetwork__' . esc_textarea( $site['guid'] ) . '">' . esc_textarea( $site['post_type'] ) . '</label></td>';
+				echo '<td><label for="supernetwork__' . esc_textarea( $site['guid'] ) . '">' . esc_textarea( $site['post_status'] ) . '</label></td>';
+				echo '</tr>';
+			}
+	
+			echo '</tbody></table>';
+			submit_button( 'Keep Selected and Delete All Others' );
+			echo '</form>';
+		}
+		else
+		{
+			echo '<h2>Republished Posts and Pages</h2>';
+			$this->republished();
+		}
+		
 		echo '<h2>Upgrade to Network</h2>';
 		$this->get_blogs_for_user();
 		echo '</div>';
@@ -279,32 +353,35 @@ class Network
 
 	public function intercept_query( $query )
 	{
-		$parsed = $this->parser->parse( $query );
-
-		if ( isset( $parsed['SELECT'] ) && isset( $parsed['FROM'] ) )
+		if ( $this->consolidated )
 		{
-			foreach ( $parsed['FROM'] as &$from )
+			$parsed = $this->parser->parse( $query );
+
+			if ( isset( $parsed['SELECT'] ) && isset( $parsed['FROM'] ) )
 			{
-				if ( isset( $from['table'] ) && $from['table'] === $GLOBALS['wpdb']->posts )
+				foreach ( $parsed['FROM'] as &$from )
 				{
-					$from = $this->parser->parse(
-						'from (' . $this->union( 'posts' ) . ') ' . $GLOBALS['wpdb']->posts
-					)['FROM'][0];
+					if ( isset( $from['table'] ) && $from['table'] === $GLOBALS['wpdb']->posts )
+					{
+						$from = $this->parser->parse(
+							'from (' . $this->union( 'posts' ) . ') ' . $GLOBALS['wpdb']->posts
+						)['FROM'][0];
 
-					$this->remove_collisions( $parsed, 'ID' );
+						$this->remove_collisions( $parsed, 'ID' );
 
-					return $this->creator->create( $parsed );
-				}
-				
-				if ( isset( $from['table'] ) && $from['table'] === $GLOBALS['wpdb']->postmeta )
-				{
-					$from = $this->parser->parse(
-						'from (' . $this->union( 'postmeta' ) . ') ' . $GLOBALS['wpdb']->postmeta
-					)['FROM'][0];
-
-					$this->remove_collisions( $parsed, 'post_id' );
+						return $this->creator->create( $parsed );
+					}
 					
-					return $this->creator->create( $parsed );
+					if ( isset( $from['table'] ) && $from['table'] === $GLOBALS['wpdb']->postmeta )
+					{
+						$from = $this->parser->parse(
+							'from (' . $this->union( 'postmeta' ) . ') ' . $GLOBALS['wpdb']->postmeta
+						)['FROM'][0];
+
+						$this->remove_collisions( $parsed, 'post_id' );
+						
+						return $this->creator->create( $parsed );
+					}
 				}
 			}
 		}

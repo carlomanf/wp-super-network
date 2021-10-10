@@ -33,6 +33,15 @@ class Blog
 			return $this->wp_site->blog_id;
 		}
 	}
+	
+	public function table( $name )
+	{
+		$id = $this->wp_site->blog_id;
+		$table = $GLOBALS['wpdb']->base_prefix;
+		if ( $id > 1 ) $table .= $id . '_';
+		$table .= $name;
+		return $table;
+	}
 
 	/**
 	 * Pop blog out of its network and create a new network.

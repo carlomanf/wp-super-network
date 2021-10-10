@@ -86,6 +86,8 @@ class WP_Super_Network
 				add_filter( 'pre_option_' . $option, array( $this, 'options' ), 10, 2 );
 			}
 		}
+
+		$this->network->consolidated = !empty( get_option( 'supernetwork_consolidated' )['consolidated'] );
 	}
 
 	public function summary()

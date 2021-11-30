@@ -64,9 +64,6 @@ class WP_Super_Network
 	public function run()
 	{
 		// Load functions
-		add_filter( 'admin_init', array( $this, 'update_db' ) );
-		add_filter( 'page_row_actions', array( $this, 'republish' ), 10, 2 );
-		add_filter( 'post_row_actions', array( $this, 'republish' ), 10, 2 );
 		add_filter( 'post_type_link', array( $this->network, 'intercept_permalink' ), 10, 2 );
 		add_filter( 'post_link', array( $this->network, 'intercept_permalink' ), 10, 2 );
 		add_filter( 'query', array( $this->network, 'intercept_query' ), 10, 2 );
@@ -89,6 +86,13 @@ class WP_Super_Network
 		}
 
 		$this->network->consolidated = !empty( get_option( 'supernetwork_consolidated' )['consolidated'] );
+
+		if ( !$this->network->consolidated )
+		{
+			add_filter( 'admin_init', array( $this, 'update_db' ) );
+			add_filter( 'page_row_actions', array( $this, 'republish' ), 10, 2 );
+			add_filter( 'post_row_actions', array( $this, 'republish' ), 10, 2 );
+		}
 	}
 
 	public function summary()
@@ -102,6 +106,11 @@ class WP_Super_Network
 		);
 	}
 
+	/**
+	 * Update database to republish a post.
+	 *
+	 * @since 1.0.5
+	 */
 	public function update_db()
 	{
 		if ( empty( $_GET['republish'] ) )

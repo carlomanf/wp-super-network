@@ -62,6 +62,14 @@ class Network
 		}
 	}
 
+	public function __get( $key )
+	{
+		if ( $key = 'consolidated' )
+		{
+			return $this->consolidated;
+		}
+	}
+
 	public function __set( $key, $value )
 	{
 		if ( $key = 'consolidated' )

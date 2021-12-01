@@ -28,7 +28,7 @@ class Network
 	 * @since 1.0.4
 	 * @var array
 	 */
-	private $blogs;
+	private $blogs = array();
 
 	/**
 	 * Is this network on consolidated mode.
@@ -36,7 +36,7 @@ class Network
 	 * @since 1.0.6
 	 * @var bool
 	 */
-	private $consolidated;
+	private $consolidated = false;
 
 	/**
 	 * Settings page.
@@ -49,7 +49,9 @@ class Network
 	private $parser;
 	private $creator;
 
-	private $collisions;
+	private $collisions = array();
+	private $republished = array();
+	private $post_types = array();
 
 	public function shared_auto_increment( $post_ID, $post, $update )
 	{
@@ -76,58 +78,52 @@ class Network
 		{
 			if ( $value === true )
 			{
-				$this->collisions = $GLOBALS['wpdb']->get_col( 'select ID from (' . $this->union( 'posts' ) . ') posts group by ID having count(*) > 1' );
+				$this->post_types = array_keys( (array) get_option( 'supernetwork_post_types' ) );
 				$this->consolidated = true;
 			}
 			
 			if ( $value === false )
 			{
-				$this->collisions = array();
+				$this->post_types = array();
 				$this->consolidated = false;
 			}
 		}
 	}
 
-	private function union( $table )
+	private function union( $table, $id = null )
 	{
 		$tables = array();
 		foreach ( $this->blogs as $blog )
 		{
-			$where = '';
-			
-			if ( $table === 'posts' && !$blog->is_network() )
+			$where = array();
+
+			if ( !empty( $id ) )
 			{
-				$where = ' where post_type not in (\'' . implode( '\', \'', array_keys( (array) get_option( 'supernetwork_post_types' ) ) ) . '\')';
+				if ( $this->consolidated && !empty( $this->collisions ) )
+				{
+					$where[] = $id . ' not in (' . implode( ', ', $this->collisions ) . ')';
+				}
+
+				if ( !$this->consolidated && !empty( $this->republished ) )
+				{
+					$where[] = $id . ' in (' . implode( ', ', $this->republished ) . ')';
+				}
 			}
-			
-			$tables[] = 'select * from ' . $blog->table( $table ) . $where;
+
+			if ( $this->consolidated && $table === 'posts' && !$blog->is_network() && !empty( $this->post_types ) )
+			{
+				$where[] = 'post_type not in (\'' . implode( '\', \'', $this->post_types ) . '\')';
+			}
+
+			$tables[] = 'select * from ' . $blog->table( $table ) . ( empty( $where ) ? '' : ( ' where ' . implode( ' and ', $where ) ) );
 		}
 
 		return implode( ' union ', $tables );
 	}
 
-	private function remove_collisions( &$parsed, $col )
+	private function union_republished( $table, $id )
 	{
-		$parsed['WHERE'] = isset( $parsed['WHERE'] ) ? array(
-			array(
-				'expr_type' => 'bracket_expression',
-				'sub_tree' => $parsed['WHERE']
-			)
-		) : array();
-
-		$parsed['WHERE'][] = array(
-			'expr_type' => 'operator',
-			'base_expr' => 'and'
-		);
-
-		$parsed['WHERE'][] = array(
-			'expr_type' => 'bracket_expression',
-			'sub_tree' => $this->parser->parse(
-				'where ' . $col . ' not in (' . implode( ', ', $this->collisions ) . ')'
-			)['WHERE']
-		);
-
-		return $parsed;
+		return 'select * from ' . $GLOBALS['wpdb']->__get( $table ) . ( empty( $this->republished )? '' : ' union ' . $this->union( $table, $id ) );
 	}
 
 	public function report_collisions()
@@ -136,6 +132,11 @@ class Network
 		{
 			echo '<div class="notice notice-error"><p><strong>WP Super Network detected ' . count( $this->collisions ) . ' post ID collisions</strong> across your network! These posts have been temporarily hidden. To access them again, please turn off consolidated mode.</p></div>';
 		}
+	}
+
+	public function load_republished()
+	{
+		$this->republished = $this->consolidate( 'posts_per_page=-1&meta_key=_supernetwork_share&post_type=any&post_status=any&fields=ids' );
 	}
 
 	/**
@@ -149,10 +150,7 @@ class Network
 	 */
 	public function __construct( $network )
 	{
-		$id = $network->__get( 'id' );
-		$this->blogs = array();
-
-		foreach ( get_sites( 'network_id=' . $id ) as $site )
+		foreach ( get_sites( 'network_id=' . $network->id ) as $site )
 		{
 			array_push( $this->blogs, new Blog( $site ) );
 		}
@@ -162,7 +160,7 @@ class Network
 		$this->parser = new \PHPSQLParser\PHPSQLParser();
 		$this->creator = new \PHPSQLParser\PHPSQLCreator();
 
-		$this->__set( 'consolidated', false );
+		$this->collisions = $GLOBALS['wpdb']->get_col( 'select ID from (' . $this->union( 'posts' ) . ') posts group by ID having count(*) > 1' );
 
 		$this->page = new Settings_Page(
 			array( 'supernetwork_options', 'supernetwork_post_types', 'supernetwork_consolidated' ),
@@ -271,11 +269,10 @@ class Network
 			echo '<tbody>';
 
 			$id = min( $this->collisions );
+			$this->consolidated = false;
 
 			if ( isset( $_POST['supernetwork_post_collision_' . $id ] ) )
 			{
-				$this->__set( 'consolidated', false );
-				
 				foreach ( $this->blogs as $blog )
 				{
 					switch_to_blog( $blog->id );
@@ -288,7 +285,7 @@ class Network
 					restore_current_blog();
 				}
 
-				$this->__set( 'consolidated', true );
+				$this->collisions = array_diff( $collisions, array( $id ) );
 				$id = min( $this->collisions );
 			}
 			
@@ -304,6 +301,8 @@ class Network
 				echo '</tr>';
 			}
 	
+			$this->consolidated = true;
+
 			echo '</tbody></table>';
 			submit_button( 'Keep Selected and Delete All Others' );
 			echo '</form>';
@@ -326,7 +325,7 @@ class Network
 	 */
 	public function republished()
 	{
-		$republished = $this->consolidate( 'meta_key=_supernetwork_share&post_type=any' );
+		$republished = $this->consolidate( 'posts_per_page=-1&meta_key=_supernetwork_share&post_type=any&post_status=any' );
 
 		if ( empty( $republished ) )
 		{
@@ -377,40 +376,89 @@ class Network
 
 	public function intercept_query( $query )
 	{
-		if ( $this->consolidated )
+		return $this->creator->create(
+			$this->modify_query(
+				$this->parser->parse( $query )
+			)
+		);
+	}
+
+	private function modify_query( $parsed )
+	{
+		if ( !isset( $parsed['INSERT'] ) && !isset( $parsed['UPDATE'] ) && !isset( $parsed['DELETE'] ) )
 		{
-			$parsed = $this->parser->parse( $query );
-
-			if ( isset( $parsed['SELECT'] ) && isset( $parsed['FROM'] ) )
+			if ( isset( $parsed['UNION'] ) )
 			{
-				foreach ( $parsed['FROM'] as &$from )
+				foreach ( $parsed['UNION'] as &$query )
 				{
-					if ( isset( $from['table'] ) && $from['table'] === $GLOBALS['wpdb']->posts )
+					$query = $this->modify_query( $query );
+				}
+			}
+			else
+			{
+				if ( isset( $parsed['SELECT'] ) && isset( $parsed['FROM'] ) )
+				{
+					foreach ( $parsed['FROM'] as &$from )
 					{
-						$from = $this->parser->parse(
-							'from (' . $this->union( 'posts' ) . ') ' . $GLOBALS['wpdb']->posts
-						)['FROM'][0];
+						if ( !empty( $from['sub_tree'] ) )
+						{
+							$from['sub_tree'] = $this->modify_query( $from['sub_tree'] );
+						}
+						else
+						{
+							foreach (
+								array(
+									array(
+										'name' => 'posts',
+										'alias' => $GLOBALS['wpdb']->posts,
+										'ID' => 'ID'
+									),
+									array(
+										'name' => 'postmeta',
+										'alias' => $GLOBALS['wpdb']->postmeta,
+										'ID' => 'post_id'
+									)
+								) as $table
+							)
+							{
+								if ( isset( $from['table'] ) && $from['table'] === $table['alias'] )
+								{
+									$from['expr_type'] = 'subquery';
+									$from['sub_tree'] = $this->parser->parse( $this->consolidated? $this->union( $table['name'], $table['ID'] ) : $this->union_republished( $table['name'], $table['ID'] ) );
+									$from['alias'] = array(
+										'as' => false,
+										'name' => $table['alias'],
+										'no_quotes' => array(
+											'delim' => false,
+											'parts' => array( $table['alias'] )
+										),
+										'base_expr' => $table['alias']
+									);
 
-						$this->remove_collisions( $parsed, 'ID' );
-
-						return $this->creator->create( $parsed );
+									unset( $from['table'] );
+								}
+							}
+						}
 					}
-					
-					if ( isset( $from['table'] ) && $from['table'] === $GLOBALS['wpdb']->postmeta )
-					{
-						$from = $this->parser->parse(
-							'from (' . $this->union( 'postmeta' ) . ') ' . $GLOBALS['wpdb']->postmeta
-						)['FROM'][0];
 
-						$this->remove_collisions( $parsed, 'post_id' );
-						
-						return $this->creator->create( $parsed );
+					foreach ( array( 'WHERE', 'HAVING' ) as $clause )
+					{
+						if ( isset( $parsed[ $clause ] ) )
+						{
+							foreach ( $parsed[ $clause ] as &$subclause )
+							{
+								if ( !empty( $subclause['sub_tree'] ) )
+								{
+									$subclause['sub_tree'] = $this->modify_query( $subclause['sub_tree'] );
+								}
+							}
+						}
 					}
 				}
 			}
 		}
 
-		return $query;
+		return $parsed;
 	}
 
 	public function intercept_permalink( $permalink, $the_post )

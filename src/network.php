@@ -6,6 +6,13 @@ namespace WP_Super_Network;
 
 class Network
 {
+	const ID_COLS = array(
+		'comments' => 'comment_post_ID',
+		'postmeta' => 'post_id',
+		'posts' => 'ID',
+		'term_relationships' => 'object_id'
+	);
+
 	/**
 	 * Supernetwork
 	 *
@@ -36,7 +43,7 @@ class Network
 	 * @since 1.0.6
 	 * @var bool
 	 */
-	private $consolidated = false;
+	private $consolidated = true;
 
 	/**
 	 * Settings page.
@@ -55,64 +62,88 @@ class Network
 
 	public function shared_auto_increment( $post_ID, $post, $update )
 	{
-		if ( !$update )
+		if ( !$update && $this->consolidated )
 		{
-			foreach ( $this->blogs as $blog )
+			$this->set_auto_increment( $post_ID + 1 );
+		}
+	}
+
+	private function set_auto_increment( $new )
+	{
+		foreach ( $this->blogs as $blog )
+		{
+			if ( $new > (int) $GLOBALS['wpdb']->get_var( 'select auto_increment from information_schema.tables where table_schema = \'' . DB_NAME . '\' and table_name = \'' . $blog->table( 'posts' ) . '\'' ) )
 			{
-				$GLOBALS['wpdb']->query( 'alter table ' . $blog->table( 'posts' ) . ' auto_increment = ' . (string) ($post_ID + 1) );
+				$GLOBALS['wpdb']->query( 'alter table ' . $blog->table( 'posts' ) . ' auto_increment = ' . (string) $new );
 			}
 		}
 	}
 
 	public function __get( $key )
 	{
-		if ( $key = 'consolidated' )
+		if ( $key === 'consolidated' )
 		{
 			return $this->consolidated;
+		}
+
+		if ( $key === 'collisions' )
+		{
+			return $this->collisions;
 		}
 	}
 
 	public function __set( $key, $value )
 	{
-		if ( $key = 'consolidated' )
+		if ( $key === 'consolidated' )
 		{
 			if ( $value === true )
 			{
-				$this->post_types = array_keys( (array) get_option( 'supernetwork_post_types' ) );
 				$this->consolidated = true;
 			}
 			
 			if ( $value === false )
 			{
-				$this->post_types = array();
 				$this->consolidated = false;
+
+				if ( !empty( $this->republished ) )
+				{
+					$this->set_auto_increment( $this->republished[0] + 1 );
+				}
 			}
 		}
 	}
 
-	private function union( $table, $id = null )
+	private function union( $table )
 	{
+		if ( !$this->consolidated && empty( $this->republished ) )
+		{
+			return $GLOBALS['wpdb']->__get( $table );
+		}
+
 		$tables = array();
+
 		foreach ( $this->blogs as $blog )
 		{
 			$where = array();
 
-			if ( !empty( $id ) )
+			if ( $this->consolidated )
 			{
-				if ( $this->consolidated && !empty( $this->collisions ) )
+				if ( !empty( $this->collisions ) )
 				{
-					$where[] = $id . ' not in (' . implode( ', ', $this->collisions ) . ')';
+					$where[] = self::ID_COLS[ $table ] . ' not in (' . implode( ', ', $this->collisions ) . ')';
 				}
 
-				if ( !$this->consolidated && !empty( $this->republished ) )
+				if ( $table === 'posts' && !empty( $this->post_types ) && !$blog->is_network() )
 				{
-					$where[] = $id . ' in (' . implode( ', ', $this->republished ) . ')';
+					$where[] = 'post_type not in (\'' . implode( '\', \'', $this->post_types ) . '\')';
 				}
 			}
-
-			if ( $this->consolidated && $table === 'posts' && !$blog->is_network() && !empty( $this->post_types ) )
+			else
 			{
-				$where[] = 'post_type not in (\'' . implode( '\', \'', $this->post_types ) . '\')';
+				if ( $blog->table( $table ) !== $GLOBALS['wpdb']->__get( $table ) )
+				{
+					$where[] = self::ID_COLS[ $table ] . ' in (' . implode( ', ', $this->republished ) . ')';
+				}
 			}
 
 			$tables[] = 'select * from ' . $blog->table( $table ) . ( empty( $where ) ? '' : ( ' where ' . implode( ' and ', $where ) ) );
@@ -121,22 +152,12 @@ class Network
 		return implode( ' union ', $tables );
 	}
 
-	private function union_republished( $table, $id )
-	{
-		return 'select * from ' . $GLOBALS['wpdb']->__get( $table ) . ( empty( $this->republished )? '' : ' union ' . $this->union( $table, $id ) );
-	}
-
 	public function report_collisions()
 	{
 		if ( $this->consolidated && !empty( $this->collisions ) )
 		{
 			echo '<div class="notice notice-error"><p><strong>WP Super Network detected ' . count( $this->collisions ) . ' post ID collisions</strong> across your network! These posts have been temporarily hidden. To access them again, please turn off consolidated mode.</p></div>';
 		}
-	}
-
-	public function load_republished()
-	{
-		$this->republished = $this->consolidate( 'posts_per_page=-1&meta_key=_supernetwork_share&post_type=any&post_status=any&fields=ids' );
 	}
 
 	/**
@@ -160,7 +181,9 @@ class Network
 		$this->parser = new \PHPSQLParser\PHPSQLParser();
 		$this->creator = new \PHPSQLParser\PHPSQLCreator();
 
-		$this->collisions = $GLOBALS['wpdb']->get_col( 'select ID from (' . $this->union( 'posts' ) . ') posts group by ID having count(*) > 1' );
+		$this->collisions = $GLOBALS['wpdb']->get_col( 'select ID from (' . $this->union( 'posts' ) . ') posts group by ID having count(*) > 1 order by ID asc' );
+		$this->republished = $GLOBALS['wpdb']->get_col( 'select post_id from (' . $this->union( 'postmeta' ) . ') postmeta where meta_key = \'_supernetwork_share\' order by post_id desc' );
+		$this->post_types = array_keys( (array) get_option( 'supernetwork_post_types' ) );
 
 		$this->page = new Settings_Page(
 			array( 'supernetwork_options', 'supernetwork_post_types', 'supernetwork_consolidated' ),
@@ -268,11 +291,12 @@ class Network
 			echo '<thead><tr><th scope="col">Keep?</th><th scope="col">GUID</th><th scope="col">Post Title</th><th scope="col">Post Preview</th><th scope="col">Post Type</th><th scope="col">Post Status</th></tr></thead>';
 			echo '<tbody>';
 
-			$id = min( $this->collisions );
-			$this->consolidated = false;
+			$id = $this->collisions[0];
 
 			if ( isset( $_POST['supernetwork_post_collision_' . $id ] ) )
 			{
+				$this->consolidated = false;
+
 				foreach ( $this->blogs as $blog )
 				{
 					switch_to_blog( $blog->id );
@@ -285,11 +309,19 @@ class Network
 					restore_current_blog();
 				}
 
-				$this->collisions = array_diff( $collisions, array( $id ) );
-				$id = min( $this->collisions );
+				$this->consolidated = true;
+
+				array_shift( $this->collisions );
+				$id = $this->collisions[0];
 			}
-			
-			foreach ( $GLOBALS['wpdb']->get_results( 'select guid, post_title, substring(post_content, 1, 500) as post_preview, post_type, post_status from (' . $this->union( 'posts' ) . ') posts where ID = ' . $id, ARRAY_A ) as $site )
+
+			$old_collisions = $this->collisions;
+			$old_post_types = $this->post_types;
+
+			$this->collisions = array();
+			$this->post_types = array();
+
+			foreach ( $GLOBALS['wpdb']->get_results( 'select guid, post_title, substring(post_content, 1, 500) as post_preview, post_type, post_status from ' . $GLOBALS['wpdb']->posts . ' where ID = ' . $id, ARRAY_A ) as $site )
 			{
 				echo '<tr>';
 				echo '<td><input type="radio" id="supernetwork__' . esc_textarea( $site['guid'] ) . '" value="' . esc_textarea( $site['guid'] ) . '" name="supernetwork_post_collision_' . $id . '"></td>';
@@ -300,8 +332,9 @@ class Network
 				echo '<td><label for="supernetwork__' . esc_textarea( $site['guid'] ) . '">' . esc_textarea( $site['post_status'] ) . '</label></td>';
 				echo '</tr>';
 			}
-	
-			$this->consolidated = true;
+
+			$this->collisions = $old_collisions;
+			$this->post_types = $old_post_types;
 
 			echo '</tbody></table>';
 			submit_button( 'Keep Selected and Delete All Others' );
@@ -406,33 +439,25 @@ class Network
 						}
 						else
 						{
-							foreach (
-								array(
-									array(
-										'name' => 'posts',
-										'alias' => $GLOBALS['wpdb']->posts,
-										'ID' => 'ID'
-									),
-									array(
-										'name' => 'postmeta',
-										'alias' => $GLOBALS['wpdb']->postmeta,
-										'ID' => 'post_id'
-									)
-								) as $table
-							)
+							foreach ( array_keys( self::ID_COLS ) as $table )
 							{
-								if ( isset( $from['table'] ) && $from['table'] === $table['alias'] )
+								if ( isset( $from['table'] ) && $from['table'] === $GLOBALS['wpdb']->__get( $table ) )
 								{
+									if ( ( $union = $this->union( $table ) ) === $from['table'] )
+									{
+										continue;
+									}
+
 									$from['expr_type'] = 'subquery';
-									$from['sub_tree'] = $this->parser->parse( $this->consolidated? $this->union( $table['name'], $table['ID'] ) : $this->union_republished( $table['name'], $table['ID'] ) );
+									$from['sub_tree'] = $this->parser->parse( $union );
 									$from['alias'] = array(
 										'as' => false,
-										'name' => $table['alias'],
+										'name' => $GLOBALS['wpdb']->__get( $table ),
 										'no_quotes' => array(
 											'delim' => false,
-											'parts' => array( $table['alias'] )
+											'parts' => array( $GLOBALS['wpdb']->__get( $table ) )
 										),
-										'base_expr' => $table['alias']
+										'base_expr' => $GLOBALS['wpdb']->__get( $table )
 									);
 
 									unset( $from['table'] );

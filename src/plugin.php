@@ -67,7 +67,6 @@ class WP_Super_Network
 		add_filter( 'post_type_link', array( $this->network, 'intercept_permalink' ), 10, 2 );
 		add_filter( 'post_link', array( $this->network, 'intercept_permalink' ), 10, 2 );
 		add_filter( 'query', array( $this->network, 'intercept_query' ), 10, 2 );
-		add_filter( 'wp_loaded', array( $this->network, 'load_republished' ) );
 		add_filter( 'wp_insert_post', array( $this->network, 'shared_auto_increment' ), 10, 3 );
 		add_filter( 'network_admin_menu', array( $this, 'summary' ) );
 
@@ -135,12 +134,14 @@ class WP_Super_Network
 	 */
 	public function republish( $actions, $post )
 	{
-		$link = 'post' == $post->post_type ? admin_url( 'edit.php?republish=' . $post->ID ) : admin_url( 'edit.php?post_type=' . $post->post_type . '&republish=' . $post->ID );
-		$post2 = get_post( $post->ID );
+		if ( !current_user_can( 'edit_post', $post->ID ) )
+			return $actions;
 
-		if ( empty( $post2 ) || $post2->guid !== $post->guid )
+		$link = 'post' == $post->post_type ? admin_url( 'edit.php?republish=' . $post->ID ) : admin_url( 'edit.php?post_type=' . $post->post_type . '&republish=' . $post->ID );
+
+		if ( in_array( (string) $post->ID, $this->network->collisions, true ) )
 		{
-			$actions['republish'] = '<b style="color: #555;">' . __( 'Republished', 'supernetwork' ) . '</b>';
+			$actions['republish'] = '<i style="color: #888;">' . __( 'Can&apos;t Republish', 'supernetwork' ) . '</i>';
 		}
 		else
 		{

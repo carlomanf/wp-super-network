@@ -507,6 +507,32 @@ class Network
 		return $this->intercept_permalink( $permalink, $post->ID );
 	}
 
+	public function intercept_capability_write( $caps, $cap, $user_id, $args )
+	{
+		if ( in_array( $cap, array( 'delete_post', 'edit_post', 'publish_post' ), true ) )
+		{
+			if ( get_current_blog_id() !== $this->get_blog( get_post( $args[0] )->ID )->id )
+			{
+				return array( 'do_not_allow' );
+			}
+		}
+
+		return $caps;
+	}
+
+	public function intercept_capability_read( $allcaps, $caps, $args, $user )
+	{
+		if ( $args[0] === 'read_post' )
+		{
+			if ( !is_null( $blog = $this->get_blog( get_post( $args[2] )->ID ) ) )
+			{
+				return ( new \WP_User( $user, '', $blog->id ) )->allcaps;
+			}
+		}
+
+		return $allcaps;
+	}
+
 	private function get_blog( $id )
 	{
 		if ( !in_array( (string) $id, $this->collisions, true ) )

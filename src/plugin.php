@@ -67,6 +67,8 @@ class WP_Super_Network
 		add_filter( 'post_type_link', array( $this->network, 'intercept_permalink_for_post' ), 10, 2 );
 		add_filter( 'post_link', array( $this->network, 'intercept_permalink_for_post' ), 10, 2 );
 		add_filter( 'page_link', array( $this->network, 'intercept_permalink' ), 10, 2 );
+		add_filter( 'map_meta_cap', array( $this->network, 'intercept_capability_write' ), 10, 4 );
+		add_filter( 'user_has_cap', array( $this->network, 'intercept_capability_read' ), 10, 4 );
 		add_filter( 'query', array( $this->network, 'intercept_query' ), 10, 2 );
 		add_filter( 'wp_insert_post', array( $this->network, 'shared_auto_increment' ), 10, 3 );
 		add_filter( 'network_admin_menu', array( $this, 'summary' ) );
@@ -101,7 +103,7 @@ class WP_Super_Network
 		add_menu_page(
 			'WP Super Network',
 			'Super Network',
-			'create_sites',
+			'manage_network_options',
 			'wp_super_network',
 			array( $this->network, 'page' )
 		);
@@ -135,21 +137,30 @@ class WP_Super_Network
 	 */
 	public function republish( $actions, $post )
 	{
-		if ( !current_user_can( 'edit_post', $post->ID ) )
-			return $actions;
-
 		$link = 'post' == $post->post_type ? admin_url( 'edit.php?republish=' . $post->ID ) : admin_url( 'edit.php?post_type=' . $post->post_type . '&republish=' . $post->ID );
 
-		if ( in_array( (string) $post->ID, $this->network->collisions, true ) )
+		if ( in_array( (string) $post->ID, $this->network->republished, true ) )
 		{
-			$actions['republish'] = '<i style="color: #888;">' . __( 'Can&apos;t Republish', 'supernetwork' ) . '</i>';
+			$actions['republish'] = '<b style="color: #555;">' . __( 'Republished', 'supernetwork' ) . '</b>';
+
+			if ( current_user_can( 'edit_post', $post->ID ) )
+			{
+				$actions['republish'] .= ' <a href="' . $link . '&revoke=1">(' . __( 'Revoke?', 'supernetwork' ) . ')</a>';
+			}
 		}
 		else
 		{
-			if ( get_post_meta( $post->ID, '_supernetwork_share' ) )
-				$actions['republish'] = '<b style="color: #555;">' . __( 'Republished', 'supernetwork' ) . '</b> <a href="' . $link . '&revoke=1">(' . __( 'Revoke?', 'supernetwork' ) . ')</a>';
-			else
-				$actions['republish'] = '<a href="' . $link . '">' . __( 'Republish', 'supernetwork' ) . '</a>';
+			if ( current_user_can( 'edit_post', $post->ID ) )
+			{
+				if ( in_array( (string) $post->ID, $this->network->collisions, true ) )
+				{
+					$actions['republish'] = '<i style="color: #888;">' . __( 'Can&apos;t Republish', 'supernetwork' ) . '</i>';
+				}
+				else
+				{
+					$actions['republish'] = '<a href="' . $link . '">' . __( 'Republish', 'supernetwork' ) . '</a>';
+				}
+			}
 		}
 
 		return $actions;

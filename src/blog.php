@@ -30,7 +30,7 @@ class Blog
 	{
 		if ( $key === 'id' )
 		{
-			return $this->wp_site->blog_id;
+			return (int) $this->wp_site->blog_id;
 		}
 		
 		if ( $key === 'network_id' )

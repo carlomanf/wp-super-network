@@ -64,8 +64,9 @@ class WP_Super_Network
 	public function run()
 	{
 		// Load functions
-		add_filter( 'post_type_link', array( $this->network, 'intercept_permalink' ), 10, 2 );
-		add_filter( 'post_link', array( $this->network, 'intercept_permalink' ), 10, 2 );
+		add_filter( 'post_type_link', array( $this->network, 'intercept_permalink_for_post' ), 10, 2 );
+		add_filter( 'post_link', array( $this->network, 'intercept_permalink_for_post' ), 10, 2 );
+		add_filter( 'page_link', array( $this->network, 'intercept_permalink' ), 10, 2 );
 		add_filter( 'query', array( $this->network, 'intercept_query' ), 10, 2 );
 		add_filter( 'wp_insert_post', array( $this->network, 'shared_auto_increment' ), 10, 3 );
 		add_filter( 'network_admin_menu', array( $this, 'summary' ) );

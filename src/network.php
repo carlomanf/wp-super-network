@@ -486,36 +486,52 @@ class Network
 		return $parsed;
 	}
 
-	public function intercept_permalink( $permalink, $the_post )
+	public function intercept_permalink( $permalink, $post_ID )
 	{
 		// Prevent infinite loop
-		if ( !empty( $GLOBALS['_wp_switched_stack'] ) )
-			return $permalink;
-		
-		foreach ( $this->blogs as $blog )
+		if ( empty( $GLOBALS['_wp_switched_stack'] ) )
 		{
-			switch_to_blog( $blog->wp_site->__get( 'id' ) );
-
-			// Try the post with the same ID on each site
-			// and check if its guid matches
-			wp_cache_flush();
-			$a_post = get_post( $the_post->ID );
-
-			if ( empty( $a_post ) || $the_post->guid != $a_post->guid )
+			if ( !is_null( $blog = $this->get_blog( $post_ID ) ) )
 			{
-				// Couldn't find the post, or the guid didn't match
+				switch_to_blog( $blog->id );
+				$permalink = get_permalink( $post_ID );
 				restore_current_blog();
-				continue;
-			}
-			else
-			{
-				// Correct site was found
-				$permalink = get_permalink( $a_post );
-				restore_current_blog();
-				return $permalink;
 			}
 		}
 
-		return '#';
+		return $permalink;
+	}
+
+	public function intercept_permalink_for_post( $permalink, $post )
+	{
+		return $this->intercept_permalink( $permalink, $post->ID );
+	}
+
+	private function get_blog( $id )
+	{
+		if ( !in_array( (string) $id, $this->collisions, true ) )
+		{
+			$old_consolidated = $this->consolidated;
+			$old_republished = $this->republished;
+
+			$this->consolidated = false;
+			$this->republished = array();
+
+			foreach ( $this->blogs as $blog )
+			{
+				if ( !empty( $GLOBALS['wpdb']->get_col( 'select ID from ' . $blog->table( 'posts' ) . ' where ID = ' . $id . ' limit 1' ) ) )
+				{
+					$this->consolidated = $old_consolidated;
+					$this->republished = $old_republished;
+
+					return $blog;
+				}
+			}
+
+			$this->consolidated = $old_consolidated;
+			$this->republished = $old_republished;
+		}
+
+		return null;
 	}
 }

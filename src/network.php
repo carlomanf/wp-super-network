@@ -90,6 +90,11 @@ class Network
 		{
 			return $this->collisions;
 		}
+
+		if ( $key === 'republished' )
+		{
+			return $this->republished;
+		}
 	}
 
 	public function __set( $key, $value )
@@ -154,7 +159,7 @@ class Network
 
 	public function report_collisions()
 	{
-		if ( $this->consolidated && !empty( $this->collisions ) )
+		if ( $this->consolidated && !empty( $this->collisions ) && current_user_can( 'manage_network_options' ) )
 		{
 			echo '<div class="notice notice-error"><p><strong>WP Super Network detected ' . count( $this->collisions ) . ' post ID collisions</strong> across your network! These posts have been temporarily hidden. To access them again, please turn off consolidated mode.</p></div>';
 		}
@@ -511,7 +516,7 @@ class Network
 	{
 		if ( in_array( $cap, array( 'delete_post', 'edit_post', 'publish_post' ), true ) )
 		{
-			if ( get_current_blog_id() !== $this->get_blog( get_post( $args[0] )->ID )->id )
+			if ( !is_null( $blog = $this->get_blog( get_post( $args[0] )->ID ) ) && get_current_blog_id() !== $blog->id )
 			{
 				return array( 'do_not_allow' );
 			}

@@ -556,6 +556,19 @@ class Network
 		return $allcaps;
 	}
 
+	public function singular_access( $false, $wp_query )
+	{
+		if ( $wp_query->is_singular() && !is_admin() && ( !defined( 'REST_REQUEST' ) || !REST_REQUEST ) && isset( $wp_query->post ) && !is_null( $blog = $this->get_blog( $wp_query->post->ID ) ) && get_current_blog_id() !== $blog->id )
+		{
+			$wp_query->set_404();
+			status_header( 404 );
+			nocache_headers();
+			return true;
+		}
+
+		return $false;
+	}
+
 	private function get_blog( $id )
 	{
 		if ( !in_array( (string) $id, $this->collisions, true ) )

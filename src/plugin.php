@@ -69,6 +69,7 @@ class WP_Super_Network
 		add_filter( 'page_link', array( $this->network, 'intercept_permalink' ), 10, 2 );
 		add_filter( 'map_meta_cap', array( $this->network, 'intercept_capability_write' ), 10, 4 );
 		add_filter( 'user_has_cap', array( $this->network, 'intercept_capability_read' ), 10, 4 );
+		add_filter( 'pre_handle_404', array( $this->network, 'singular_access' ), 10, 2 );
 		add_filter( 'query', array( $this->network, 'intercept_query' ), 10, 2 );
 		add_filter( 'wp_insert_post', array( $this->network, 'shared_auto_increment' ), 10, 3 );
 		add_filter( 'network_admin_menu', array( $this, 'summary' ) );

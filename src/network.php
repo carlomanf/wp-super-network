@@ -446,7 +446,9 @@ class Network
 						{
 							foreach ( array_keys( self::ID_COLS ) as $table )
 							{
-								if ( isset( $from['table'] ) && $from['table'] === $GLOBALS['wpdb']->__get( $table ) )
+								$local_table = $GLOBALS['wpdb']->__get( $table );
+
+								if ( isset( $from['table'] ) && $from['table'] === $local_table )
 								{
 									if ( ( $union = $this->union( $table ) ) === $from['table'] )
 									{
@@ -455,17 +457,22 @@ class Network
 
 									$from['expr_type'] = 'subquery';
 									$from['sub_tree'] = $this->parser->parse( $union );
-									$from['alias'] = array(
-										'as' => false,
-										'name' => $GLOBALS['wpdb']->__get( $table ),
-										'no_quotes' => array(
-											'delim' => false,
-											'parts' => array( $GLOBALS['wpdb']->__get( $table ) )
-										),
-										'base_expr' => $GLOBALS['wpdb']->__get( $table )
-									);
+
+									if ( false === $from['alias'] )
+									{
+										$from['alias'] = array(
+											'as' => false,
+											'name' => $local_table,
+											'no_quotes' => array(
+												'delim' => false,
+												'parts' => array( $local_table )
+											),
+											'base_expr' => $local_table
+										);
+									}
 
 									unset( $from['table'] );
+									break;
 								}
 							}
 						}

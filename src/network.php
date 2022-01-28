@@ -414,11 +414,22 @@ class Network
 
 	public function intercept_query( $query )
 	{
-		return $this->creator->create(
-			$this->modify_query(
-				$this->parser->parse( $query )
-			)
-		);
+		try
+		{
+			return $this->creator->create(
+				$this->modify_query(
+					$this->parser->parse( $query )
+				)
+			);
+		}
+		catch ( \PHPSQLParser\exceptions\UnsupportedFeatureException $uf )
+		{
+			return $query;
+		}
+		catch ( \PHPSQLParser\exceptions\UnableToCreateSQLException $utcsql )
+		{
+			return $query;
+		}
 	}
 
 	private function modify_query( $parsed )

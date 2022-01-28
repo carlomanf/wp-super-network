@@ -288,17 +288,8 @@ class Network
 		if ( $this->consolidated )
 		{
 			echo '<h2>Post ID Collisions</h2>';
-			echo '<p>Consolidated mode is designed for fresh networks. When activated on an existing network, a large number of ID collisions are inevitable. However, you may be able to eliminate some collisions when the ID refers to a post of low importance, such as a revision or autosave.</p>';
-			echo '<p>The below table allows you to eliminate post ID collisions, one ID at a time. For each ID, you must select just ONE post to keep. All others with the same ID will be immediately and irretrievably deleted.</p>';
-	
-			echo '<form method="post" action="">';
-			echo '<table class="widefat">';
-			echo '<thead><tr><th scope="col">Keep?</th><th scope="col">GUID</th><th scope="col">Post Title</th><th scope="col">Post Preview</th><th scope="col">Post Type</th><th scope="col">Post Status</th></tr></thead>';
-			echo '<tbody>';
 
-			$id = $this->collisions[0];
-
-			if ( isset( $_POST['supernetwork_post_collision_' . $id ] ) )
+			if ( !empty( $this->collisions ) && isset( $_POST['supernetwork_post_collision_' . $this->collisions[0] ] ) )
 			{
 				$this->consolidated = false;
 
@@ -306,44 +297,57 @@ class Network
 				{
 					switch_to_blog( $blog->id );
 					
-					if ( empty( $GLOBALS['wpdb']->get_col( 'select ID from ' . $blog->table( 'posts' ) . ' where guid = \'' . $_POST['supernetwork_post_collision_' . $id ] . '\' limit 1' ) ) )
+					if ( empty( $GLOBALS['wpdb']->get_col( 'select ID from ' . $blog->table( 'posts' ) . ' where guid = \'' . $_POST['supernetwork_post_collision_' . $this->collisions[0] ] . '\' limit 1' ) ) )
 					{
-						wp_delete_post( (int) $id, true );
+						wp_delete_post( (int) $this->collisions[0], true );
 					}
 
 					restore_current_blog();
 				}
 
 				$this->consolidated = true;
-
 				array_shift( $this->collisions );
-				$id = $this->collisions[0];
 			}
 
-			$old_collisions = $this->collisions;
-			$old_post_types = $this->post_types;
-
-			$this->collisions = array();
-			$this->post_types = array();
-
-			foreach ( $GLOBALS['wpdb']->get_results( 'select guid, post_title, substring(post_content, 1, 500) as post_preview, post_type, post_status from ' . $GLOBALS['wpdb']->posts . ' where ID = ' . $id, ARRAY_A ) as $site )
+			if ( empty( $this->collisions ) )
 			{
-				echo '<tr>';
-				echo '<td><input type="radio" id="supernetwork__' . esc_textarea( $site['guid'] ) . '" value="' . esc_textarea( $site['guid'] ) . '" name="supernetwork_post_collision_' . $id . '"></td>';
-				echo '<td><label for="supernetwork__' . esc_textarea( $site['guid'] ) . '">' . esc_textarea( $site['guid'] ) . '</label></td>';
-				echo '<td><label for="supernetwork__' . esc_textarea( $site['guid'] ) . '">' . esc_textarea( $site['post_title'] ) . '</label></td>';
-				echo '<td><label for="supernetwork__' . esc_textarea( $site['guid'] ) . '">' . esc_textarea( $site['post_preview'] ) . '</label></td>';
-				echo '<td><label for="supernetwork__' . esc_textarea( $site['guid'] ) . '">' . esc_textarea( $site['post_type'] ) . '</label></td>';
-				echo '<td><label for="supernetwork__' . esc_textarea( $site['guid'] ) . '">' . esc_textarea( $site['post_status'] ) . '</label></td>';
-				echo '</tr>';
+				echo '<p>No collisions on this network!</p>';
 			}
+			else
+			{
+				$old_collisions = $this->collisions;
+				$old_post_types = $this->post_types;
 
-			$this->collisions = $old_collisions;
-			$this->post_types = $old_post_types;
+				$this->collisions = array();
+				$this->post_types = array();
 
-			echo '</tbody></table>';
-			submit_button( 'Keep Selected and Delete All Others' );
-			echo '</form>';
+				echo '<p>Consolidated mode is designed for fresh networks. When activated on an existing network, a large number of ID collisions are inevitable. However, you may be able to eliminate some collisions when the ID refers to a post of low importance, such as a revision or autosave.</p>';
+				echo '<p>The below table allows you to eliminate post ID collisions, one ID at a time. For each ID, you must select just ONE post to keep. All others with the same ID will be immediately and irretrievably deleted.</p>';
+
+				echo '<form method="post" action="">';
+				echo '<table class="widefat">';
+				echo '<thead><tr><th scope="col">Keep?</th><th scope="col">GUID</th><th scope="col">Post Title</th><th scope="col">Post Preview</th><th scope="col">Post Type</th><th scope="col">Post Status</th></tr></thead>';
+				echo '<tbody>';
+
+				foreach ( $GLOBALS['wpdb']->get_results( 'select guid, post_title, substring(post_content, 1, 500) as post_preview, post_type, post_status from ' . $GLOBALS['wpdb']->posts . ' where ID = ' . $old_collisions[0], ARRAY_A ) as $site )
+				{
+					echo '<tr>';
+					echo '<td><input type="radio" id="supernetwork__' . esc_textarea( $site['guid'] ) . '" value="' . esc_textarea( $site['guid'] ) . '" name="supernetwork_post_collision_' . $old_collisions[0] . '"></td>';
+					echo '<td><label for="supernetwork__' . esc_textarea( $site['guid'] ) . '">' . esc_textarea( $site['guid'] ) . '</label></td>';
+					echo '<td><label for="supernetwork__' . esc_textarea( $site['guid'] ) . '">' . esc_textarea( $site['post_title'] ) . '</label></td>';
+					echo '<td><label for="supernetwork__' . esc_textarea( $site['guid'] ) . '">' . esc_textarea( $site['post_preview'] ) . '</label></td>';
+					echo '<td><label for="supernetwork__' . esc_textarea( $site['guid'] ) . '">' . esc_textarea( $site['post_type'] ) . '</label></td>';
+					echo '<td><label for="supernetwork__' . esc_textarea( $site['guid'] ) . '">' . esc_textarea( $site['post_status'] ) . '</label></td>';
+					echo '</tr>';
+				}
+
+				$this->collisions = $old_collisions;
+				$this->post_types = $old_post_types;
+
+				echo '</tbody></table>';
+				submit_button( 'Keep Selected and Delete All Others' );
+				echo '</form>';
+			}
 		}
 		else
 		{

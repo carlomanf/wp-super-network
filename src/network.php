@@ -420,11 +420,10 @@ class Network
 	{
 		try
 		{
-			return $this->creator->create(
-				$this->modify_query(
-					$this->parser->parse( $query )
-				)
-			);
+			$parsed = $this->parser->parse( $query );
+
+			// Insert, update and delete queries are not currently modified.
+			return $this->modify_query( $parsed ) ? $this->creator->create( $parsed ) : $query;
 		}
 		catch ( \PHPSQLParser\exceptions\UnsupportedFeatureException $uf )
 		{
@@ -436,15 +435,15 @@ class Network
 		}
 	}
 
-	private function modify_query( $parsed )
+	private function modify_query( &$parsed )
 	{
-		if ( !isset( $parsed['INSERT'] ) && !isset( $parsed['UPDATE'] ) && !isset( $parsed['DELETE'] ) )
+		if ( in_array( array_keys( $parsed )[0], array( 'UNION', 'SELECT' ), true ) )
 		{
 			if ( isset( $parsed['UNION'] ) )
 			{
 				foreach ( $parsed['UNION'] as &$query )
 				{
-					$query = $this->modify_query( $query );
+					$this->modify_query( $query );
 				}
 			}
 			else
@@ -455,7 +454,7 @@ class Network
 					{
 						if ( !empty( $from['sub_tree'] ) )
 						{
-							$from['sub_tree'] = $this->modify_query( $from['sub_tree'] );
+							$this->modify_query( $from['sub_tree'] );
 						}
 						else
 						{
@@ -501,16 +500,18 @@ class Network
 							{
 								if ( !empty( $subclause['sub_tree'] ) )
 								{
-									$subclause['sub_tree'] = $this->modify_query( $subclause['sub_tree'] );
+									$this->modify_query( $subclause['sub_tree'] );
 								}
 							}
 						}
 					}
 				}
 			}
+
+			return true;
 		}
 
-		return $parsed;
+		return false;
 	}
 
 	public function intercept_permalink( $permalink, $post_ID )

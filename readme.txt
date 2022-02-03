@@ -1,10 +1,8 @@
 === WP Super Network ===
 Contributors: manfcarlo
-Tags: network, multisite, share, sharing
-Requires at least: 5.0
-Tested up to: 5.5
-Stable tag: 1.0.8
-Requires PHP: 5.6
+Tags: network, multisite, share, sharing, move, migrate, migration, duplicate, syndication, content, management
+Tested up to: 5.9
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -41,21 +39,29 @@ To flag posts and pages for republication, access the Posts or Pages screen in W
 
 = How do I republish a page to the whole network? =
 
-This feature is still under development. As of version 1.0.5, you can flag any post or page on a main site for republication by finding it on the Posts or Pages screen and clicking Republish.
+As of version 1.0.5, you could flag any post or page on a main site for republication by finding it on the Posts or Pages screen and clicking Republish, but it would not take any effect. Version 1.1.0 now implements the behaviour of this feature!
 
-After you have republished the post or page, you can access the network admin and click on Super Network. You will see a list of all posts and pages across all sites in the network that have been flagged for republication.
+After you have republished the post or page, it will start showing up across every site on your network. You can also access the network admin and click on Super Network. You will see a list of all posts and pages across all sites in the network that have been flagged for republication.
 
 To revoke republication, just click on Revoke in the same place where you republished the post or page.
 
-= Why do my republished posts not render properly, or not at all? =
+= Why do I see "Can't Republish" for some posts and pages? =
 
-This feature is still under development. Some fields of a republished posts may render incorrectly or not at all when viewed from another site on the network. If this causes problems, you can revoke the republication of the post according to the instructions above.
+If two or more sites on a network have a post with the same numeric ID, none of these posts is able to be republished unless all others with the same ID are permanently deleted. This limitation is very unlikely to change in future versions.
 
 = How do I turn an existing site into the main site for a new network? =
 
 This feature is still to come.
 
 = How do I manage all of my sites in a single admin area? =
+
+Go to Settings > Network and turn on consolidated mode. Effectively, this republishes all posts and pages without needing to individually flag them.
+
+= After turning on consolidated mode, why do some of my posts and pages disappear? =
+
+If two or more sites on a network have a post with the same numeric ID, none of these posts is able to be accessed on consolidated mode. You can eliminate post ID collisions by deleting posts you don't want via the network admin screen > Super Network.
+
+= Why are republished posts and pages not editable in the admin area? =
 
 This feature is still to come.
 
@@ -64,6 +70,12 @@ This feature is still to come.
 Through the WordPress support forum, or on the [GitHub page here.](https://github.com/carlomanf/wp-super-network/issues)
 
 == Changelog ==
+
+= 1.1.0 =
+* Behaviour implemented for republished posts and pages
+* New setting for consolidated mode
+* New setting to declare post types as network-only
+* Elimination of post ID collisions available in network admin
 
 = 1.0.8 =
 * Fix defect from 1.0.7

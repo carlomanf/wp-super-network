@@ -4,6 +4,8 @@
  * Plugin URI:
  * Description: Share content between sites and create offspring networks.
  * Version: 1.1.0-RC2
+ * Requires at least: 5.0
+ * Requires PHP: 5.6
  * Author: Ask Carlo
  * Author URI: https://askcarlo.com
  * Text Domain: supernetwork

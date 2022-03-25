@@ -6,13 +6,6 @@ namespace WP_Super_Network;
 
 class Network
 {
-	const ID_COLS = array(
-		'comments' => 'comment_post_ID',
-		'postmeta' => 'post_id',
-		'posts' => 'ID',
-		'term_relationships' => 'object_id'
-	);
-
 	/**
 	 * Supernetwork
 	 *
@@ -52,9 +45,6 @@ class Network
 	 * @var Settings_Page
 	 */
 	private $page;
-
-	private $parser;
-	private $creator;
 
 	private $collisions = array();
 	private $republished = array();
@@ -118,7 +108,7 @@ class Network
 		}
 	}
 
-	private function union( $table )
+	public function union( $table )
 	{
 		if ( !$this->consolidated && empty( $this->republished ) )
 		{
@@ -135,7 +125,7 @@ class Network
 			{
 				if ( !empty( $this->collisions ) )
 				{
-					$where[] = self::ID_COLS[ $table ] . ' not in (' . implode( ', ', $this->collisions ) . ')';
+					$where[] = SQL_Table::ID_COLS[ $table ] . ' not in (' . implode( ', ', $this->collisions ) . ')';
 				}
 
 				if ( $table === 'posts' && !empty( $this->post_types ) && !$blog->is_network() )
@@ -147,7 +137,7 @@ class Network
 			{
 				if ( $blog->table( $table ) !== $GLOBALS['wpdb']->__get( $table ) )
 				{
-					$where[] = self::ID_COLS[ $table ] . ' in (' . implode( ', ', $this->republished ) . ')';
+					$where[] = SQL_Table::ID_COLS[ $table ] . ' in (' . implode( ', ', $this->republished ) . ')';
 				}
 			}
 
@@ -182,9 +172,6 @@ class Network
 		}
 
 		add_filter( 'admin_footer', array( $this, 'report_collisions' ) );
-
-		$this->parser = new \PHPSQLParser\PHPSQLParser();
-		$this->creator = new \PHPSQLParser\PHPSQLCreator();
 
 		$this->collisions = $GLOBALS['wpdb']->get_col( 'select ID from (' . $this->union( 'posts' ) . ') posts group by ID having count(*) > 1 order by ID asc' );
 		$this->republished = $GLOBALS['wpdb']->get_col( 'select post_id from (' . $this->union( 'postmeta' ) . ') postmeta where meta_key = \'_supernetwork_share\' order by post_id desc' );
@@ -418,100 +405,18 @@ class Network
 
 	public function intercept_query( $query )
 	{
-		try
+		$cache = wp_cache_get( 'supernetwork_queries', $query );
+
+		if ( $cache )
 		{
-			$parsed = $this->parser->parse( $query );
-
-			// Insert, update and delete queries are not currently modified.
-			return $this->modify_query( $parsed ) ? $this->creator->create( $parsed ) : $query;
+			return $cache->transformed;
 		}
-		catch ( \PHPSQLParser\exceptions\UnsupportedFeatureException $uf )
+		else
 		{
-			return $query;
+			$transformed = new Query( $query, $this );
+			wp_cache_set( 'supernetwork_queries', $transformed, $query );
+			return $transformed->transformed;
 		}
-		catch ( \PHPSQLParser\exceptions\UnableToCreateSQLException $utcsql )
-		{
-			return $query;
-		}
-	}
-
-	private function modify_query( &$parsed )
-	{
-		if ( in_array( array_keys( $parsed )[0], array( 'UNION', 'SELECT' ), true ) )
-		{
-			if ( isset( $parsed['UNION'] ) )
-			{
-				foreach ( $parsed['UNION'] as &$query )
-				{
-					$this->modify_query( $query );
-				}
-			}
-			else
-			{
-				if ( isset( $parsed['SELECT'] ) && isset( $parsed['FROM'] ) )
-				{
-					foreach ( $parsed['FROM'] as &$from )
-					{
-						if ( !empty( $from['sub_tree'] ) )
-						{
-							$this->modify_query( $from['sub_tree'] );
-						}
-						else
-						{
-							foreach ( array_keys( self::ID_COLS ) as $table )
-							{
-								$local_table = $GLOBALS['wpdb']->__get( $table );
-
-								if ( isset( $from['table'] ) && $from['table'] === $local_table )
-								{
-									if ( ( $union = $this->union( $table ) ) === $from['table'] )
-									{
-										continue;
-									}
-
-									$from['expr_type'] = 'subquery';
-									$from['sub_tree'] = $this->parser->parse( $union );
-
-									if ( false === $from['alias'] )
-									{
-										$from['alias'] = array(
-											'as' => false,
-											'name' => $local_table,
-											'no_quotes' => array(
-												'delim' => false,
-												'parts' => array( $local_table )
-											),
-											'base_expr' => $local_table
-										);
-									}
-
-									unset( $from['table'] );
-									break;
-								}
-							}
-						}
-					}
-
-					foreach ( array( 'WHERE', 'HAVING' ) as $clause )
-					{
-						if ( isset( $parsed[ $clause ] ) )
-						{
-							foreach ( $parsed[ $clause ] as &$subclause )
-							{
-								if ( !empty( $subclause['sub_tree'] ) )
-								{
-									$this->modify_query( $subclause['sub_tree'] );
-								}
-							}
-						}
-					}
-				}
-			}
-
-			return true;
-		}
-
-		return false;
 	}
 
 	public function intercept_permalink( $permalink, $post_ID )

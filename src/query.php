@@ -58,6 +58,14 @@ class Query
 	private static $creator;
 
 	/**
+	 * Column list.
+	 *
+	 * @since 1.2.0
+	 * @var array
+	 */
+	private $column_list = null;
+
+	/**
 	 * SQL parser getter.
 	 *
 	 * @since 1.2.0
@@ -135,6 +143,7 @@ class Query
 			case 'transformed': return $this->transformed;
 			case 'parsed': return $this->parsed;
 			case 'network': return $this->network;
+			case 'column_list': return $this->column_list;
 		}
 	}
 
@@ -151,6 +160,19 @@ class Query
 		if ( empty( $node['expr_type'] ) )
 		{
 			return new SQL_Node( $node );
+		}
+
+		if ( $clause === 'INSERT' )
+		{
+			if ( $node['expr_type'] === 'column-list' )
+			{
+				$this->column_list = $node;
+			}
+
+			if ( $node['expr_type'] === 'table' )
+			{
+				return new SQL_Table_For_Insert( $node, $this );
+			}
 		}
 
 		if ( $node['expr_type'] === 'subquery' )

@@ -29,6 +29,7 @@ require_once SUPER_NETWORK_DIR . 'src/node.php';
 // Load classes.
 require_once SUPER_NETWORK_DIR . 'src/blog.php';
 require_once SUPER_NETWORK_DIR . 'src/field.php';
+require_once SUPER_NETWORK_DIR . 'src/insert.php';
 require_once SUPER_NETWORK_DIR . 'src/network.php';
 require_once SUPER_NETWORK_DIR . 'src/page.php';
 require_once SUPER_NETWORK_DIR . 'src/plugin.php';

@@ -440,22 +440,9 @@ class Network
 		return $this->intercept_permalink( $permalink, $post->ID );
 	}
 
-	public function intercept_capability_write( $caps, $cap, $user_id, $args )
+	public function intercept_capability( $allcaps, $caps, $args, $user )
 	{
-		if ( in_array( $cap, array( 'delete_post', 'edit_post', 'publish_post' ), true ) )
-		{
-			if ( !is_null( $blog = $this->get_blog( get_post( $args[0] )->ID ) ) && get_current_blog_id() !== $blog->id )
-			{
-				return array( 'do_not_allow' );
-			}
-		}
-
-		return $caps;
-	}
-
-	public function intercept_capability_read( $allcaps, $caps, $args, $user )
-	{
-		if ( $args[0] === 'read_post' )
+		if ( in_array( $args[0], array( 'delete_post', 'edit_post', 'publish_post', 'read_post' ), true ) )
 		{
 			if ( !is_null( $blog = $this->get_blog( get_post( $args[2] )->ID ) ) )
 			{
@@ -479,7 +466,7 @@ class Network
 		return $false;
 	}
 
-	private function get_blog( $id )
+	public function get_blog( $id )
 	{
 		if ( !in_array( (string) $id, $this->collisions, true ) )
 		{

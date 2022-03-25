@@ -16,7 +16,7 @@ class SQL_Subquery extends SQL_Node
 	 */
 	public function __construct( $node, $query )
 	{
-		parent::construct( $node );
+		parent::__construct( $node );
 
 		if ( isset( $node['sub_tree'] ) )
 		{

@@ -44,13 +44,18 @@ class WP_Super_Network
 		return $this->network;
 	}
 
-	function options( $value, $option )
+	public static function options( $value, $option, $default )
 	{
 		if ( !is_main_site() )
 		{
 			switch_to_blog( get_main_site_id() );
-			$value = get_option( $option );
+			$value = get_option( $option, $default );
 			restore_current_blog();
+
+			if ( $value === false )
+			{
+				add_filter( 'option_' . $option, '__return_false' );
+			}
 		}
 
 		return $value;
@@ -76,15 +81,15 @@ class WP_Super_Network
 		if ( is_main_site() ) $this->network->register_pages();
 
 		// Complete this before accessing the option on next line
-		add_filter( 'pre_option_supernetwork_options', array( $this, 'options' ), 10, 2 );
-		add_filter( 'pre_option_supernetwork_post_types', array( $this, 'options' ), 10, 2 );
-		add_filter( 'pre_option_supernetwork_consolidated', array( $this, 'options' ), 10, 2 );
+		add_filter( 'pre_option_supernetwork_options', array( __CLASS__, 'options' ), 10, 3 );
+		add_filter( 'pre_option_supernetwork_post_types', array( __CLASS__, 'options' ), 10, 3 );
+		add_filter( 'pre_option_supernetwork_consolidated', array( __CLASS__, 'options' ), 10, 3 );
 		
 		foreach ( (array) get_option( 'supernetwork_options' ) as $option => $val )
 		{
 			if ( $val && strpos( $option, '_' ) !== 0 && strpos( $option, 'supernetwork_' ) !== 0 )
 			{
-				add_filter( 'pre_option_' . $option, array( $this, 'options' ), 10, 2 );
+				add_filter( 'pre_option_' . $option, array( __CLASS__, 'options' ), 10, 3 );
 			}
 		}
 

@@ -25,25 +25,27 @@ class SQL_Table extends SQL_Node
 	{
 		parent::__construct( $node );
 
-		foreach ( array_keys( self::ID_COLS ) as $table )
-		{
-			$local_table = $GLOBALS['wpdb']->__get( $table );
+		$table = array_reverse( $node['no_quotes']['parts'] )[0];
 
-			if ( isset( $node['table'] ) && $node['table'] === $local_table )
+		foreach ( array_keys( self::ID_COLS ) as $table_schema )
+		{
+			$local_table = $GLOBALS['wpdb']->__get( $table_schema );
+
+			if ( $table === $local_table )
 			{
-				if ( ( $union = $query->network->union( $table ) ) === $node['table'] )
+				if ( ( $union = $query->network->union( $table_schema ) ) === $table )
 				{
 					continue;
 				}
 
-				if ( is_int( $query->post_id ) && $query->post_id_column === self::ID_COLS[ $table ] )
+				if ( is_int( $query->post_id ) && $query->post_id_column === self::ID_COLS[ $table_schema ] )
 				{
 					$blog_to_replace = $query->network->get_blog( $query->post_id );
 				}
 
 				if ( isset( $blog_to_replace ) )
 				{
-					$node['table'] = $blog_to_replace->table( $table );
+					$node['table'] = $blog_to_replace->table( $table_schema );
 
 					$node['no_quotes'] = array(
 						'delim' => false,

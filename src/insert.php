@@ -25,6 +25,8 @@ class SQL_Table_For_Insert extends SQL_Node
 	{
 		parent::__construct( $node );
 
+		$table = array_reverse( $node['no_quotes']['parts'] )[0];
+
 		$table_to_replace = false;
 		$position_to_check = null;
 		$replaced_blog = null;
@@ -33,11 +35,13 @@ class SQL_Table_For_Insert extends SQL_Node
 		{
 			foreach ( $query->column_list['sub_tree'] as $key => $colref )
 			{
-				if ( $colref['expr_type'] === 'colref' && in_array( $colref['no_quotes']['parts'][0], self::ID_COLS, true ) )
-				{
-					$table_to_replace = array_search( $colref['no_quotes']['parts'][0], self::ID_COLS, true );
+				$col = array_reverse( $colref['no_quotes']['parts'] )[0];
 
-					if ( $GLOBALS['wpdb']->__get( $table_to_replace ) === $node['no_quotes']['parts'][0] )
+				if ( $colref['expr_type'] === 'colref' && in_array( $col, self::ID_COLS, true ) )
+				{
+					$table_to_replace = array_search( $col, self::ID_COLS, true );
+
+					if ( $GLOBALS['wpdb']->__get( $table_to_replace ) === $table )
 					{
 						$position_to_check = $key;
 						break;

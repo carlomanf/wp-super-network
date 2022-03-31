@@ -36,8 +36,31 @@ class SQL_Table extends SQL_Node
 					continue;
 				}
 
-				$node['expr_type'] = 'subquery';
-				$node['sub_tree'] = $query->parser()->parse( $union );
+				if ( is_int( $query->post_id ) && $query->post_id_column === self::ID_COLS[ $table ] )
+				{
+					$blog_to_replace = $query->network->get_blog( $query->post_id );
+				}
+
+				if ( isset( $blog_to_replace ) )
+				{
+					$node['table'] = $blog_to_replace->table( $table );
+
+					$node['no_quotes'] = array(
+						'delim' => false,
+						'parts' => array( $node['table'] )
+					);
+
+					$node['base_expr'] = $node['table'];
+				}
+				else
+				{
+					$node['expr_type'] = 'subquery';
+					$node['base_expr'] = $union;
+					$node['sub_tree'] = $query->parser()->parse( $union );
+
+					unset( $node['table'] );
+					unset( $node['no_quotes'] );
+				}
 
 				if ( false === $node['alias'] )
 				{
@@ -52,7 +75,6 @@ class SQL_Table extends SQL_Node
 					);
 				}
 
-				unset( $node['table'] );
 				break;
 			}
 		}

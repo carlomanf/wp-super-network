@@ -66,6 +66,14 @@ class Query
 	private $column_list = null;
 
 	/**
+	 * Expressions of WHERE and HAVING clauses.
+	 *
+	 * @since 1.2.0
+	 * @var WP_Super_Network\SQL_Bracket_Expression[]
+	 */
+	private $expressions = array();
+
+	/**
 	 * SQL parser getter.
 	 *
 	 * @since 1.2.0
@@ -144,6 +152,8 @@ class Query
 			case 'parsed': return $this->parsed;
 			case 'network': return $this->network;
 			case 'column_list': return $this->column_list;
+			case 'post_id': return isset( $this->expressions['WHERE'] ) ? $this->expressions['WHERE']->post_id : null;
+			case 'post_id_column': return isset( $this->expressions['WHERE'] ) ? $this->expressions['WHERE']->post_id_column : null;
 		}
 	}
 
@@ -168,24 +178,28 @@ class Query
 			{
 				$this->column_list = $node;
 			}
-
-			if ( $node['expr_type'] === 'table' )
-			{
-				return new SQL_Table_For_Insert( $node, $this );
-			}
 		}
 
-		if ( $node['expr_type'] === 'subquery' )
+		switch ( $node['expr_type'] )
 		{
-			return new SQL_Subquery( $node, $this );
+			case 'table':
+				switch ( $clause )
+				{
+					case 'INSERT':
+						return new SQL_Table_For_Insert( $node, $this );
+					case 'DELETE':
+					case 'UPDATE':
+						return new SQL_Node( $node );
+					default:
+						return new SQL_Table( $node, $this );
+				}
+			case 'bracket_expression':
+				return $this->expressions[ $clause ] = new SQL_Bracket_Expression( $node, $this, $clause );
+			case 'subquery':
+				return new SQL_Subquery( $node, $this );
+			default:
+				return new SQL_Node( $node );
 		}
-
-		if ( $node['expr_type'] === 'table' && !in_array( $clause, array( 'DELETE', 'INSERT', 'UPDATE' ), true ) )
-		{
-			return new SQL_Table( $node, $this );
-		}
-
-		return new SQL_Node( $node );
 	}
 
 	/**
@@ -206,7 +220,22 @@ class Query
 			{
 				if ( is_string( $key ) )
 				{
-					$modified = $modified || $this->transform( $parsed[ $key ], $key );
+					if ( in_array( $key, array( 'WHERE', 'HAVING' ), true ) )
+					{
+						$transform = array(
+							array(
+								'expr_type' => 'bracket_expression',
+								'base_expr' => implode( ' ', array_column( $parsed[ $key ], 'base_expr' ) ),
+								'sub_tree' => $parsed[ $key ]
+							)
+						);
+
+						$modified = $modified || $this->transform( $transform, $key );
+					}
+					else
+					{
+						$modified = $modified || $this->transform( $parsed[ $key ], $key );
+					}
 				}
 				else
 				{

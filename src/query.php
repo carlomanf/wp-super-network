@@ -189,7 +189,7 @@ class Query
 						return new SQL_Table_For_Insert( $node, $this );
 					case 'DELETE':
 					case 'UPDATE':
-						return new SQL_Node( $node );
+						return new SQL_Table( $node, $this, false );
 					default:
 						return new SQL_Table( $node, $this );
 				}

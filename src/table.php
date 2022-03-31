@@ -20,8 +20,9 @@ class SQL_Table extends SQL_Node
 	 *
 	 * @param array
 	 * @param WP_Super_Network\Query
+	 * @param bool
 	 */
-	public function __construct( $node, $query )
+	public function __construct( $node, $query, $read_only = true )
 	{
 		parent::__construct( $node );
 
@@ -33,7 +34,7 @@ class SQL_Table extends SQL_Node
 
 			if ( $table === $local_table )
 			{
-				if ( ( $union = $query->network->union( $table_schema ) ) === $table )
+				if ( $read_only && ( $union = $query->network->union( $table_schema ) ) === $table )
 				{
 					continue;
 				}
@@ -56,15 +57,18 @@ class SQL_Table extends SQL_Node
 				}
 				else
 				{
-					$node['expr_type'] = 'subquery';
-					$node['base_expr'] = $union;
-					$node['sub_tree'] = $query->parser()->parse( $union );
+					if ( $read_only )
+					{
+						$node['expr_type'] = 'subquery';
+						$node['base_expr'] = $union;
+						$node['sub_tree'] = $query->parser()->parse( $union );
 
-					unset( $node['table'] );
-					unset( $node['no_quotes'] );
+						unset( $node['table'] );
+						unset( $node['no_quotes'] );
+					}
 				}
 
-				if ( false === $node['alias'] )
+				if ( $read_only && false === $node['alias'] )
 				{
 					$node['alias'] = array(
 						'as' => false,

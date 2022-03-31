@@ -81,11 +81,14 @@ class SQL_Table extends SQL_Node
 					);
 				}
 
+				if ( $read_only || isset( $blog_to_replace ) )
+				{
+					$this->transformed = $node;
+					$this->modified = true;
+				}
+
 				break;
 			}
 		}
-
-		$this->transformed = $node;
-		$this->modified = true;
 	}
 }

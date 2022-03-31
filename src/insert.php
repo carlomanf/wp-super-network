@@ -82,9 +82,9 @@ class SQL_Table_For_Insert extends SQL_Node
 				);
 
 				$this->transformed['base_expr'] = $this->transformed['table'];
-			}
 
-			$this->modified = true;
+				$this->modified = true;
+			}
 		}
 	}
 }

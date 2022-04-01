@@ -62,9 +62,9 @@ class Network
 	{
 		foreach ( $this->blogs as $blog )
 		{
-			if ( $new > (int) $GLOBALS['wpdb']->get_var( 'select auto_increment from information_schema.tables where table_schema = \'' . DB_NAME . '\' and table_name = \'' . $blog->table( 'posts' ) . '\'' ) )
+			if ( $new > (int) $GLOBALS['wpdb']->get_var( 'SELECT `auto_increment` FROM `information_schema`.`tables` WHERE `table_schema` = \'' . DB_NAME . '\' AND `table_name` = \'' . $blog->table( 'posts' ) . '\'' ) )
 			{
-				$GLOBALS['wpdb']->query( 'alter table ' . $blog->table( 'posts' ) . ' auto_increment = ' . (string) $new );
+				$GLOBALS['wpdb']->query( 'ALTER TABLE `' . $blog->table( 'posts' ) . '` AUTO_INCREMENT = ' . (string) $new );
 			}
 		}
 	}
@@ -125,26 +125,26 @@ class Network
 			{
 				if ( !empty( $this->collisions ) )
 				{
-					$where[] = SQL_Table::ID_COLS[ $table ] . ' not in (' . implode( ', ', $this->collisions ) . ')';
+					$where[] = '`' . SQL_Table::ID_COLS[ $table ] . '` NOT IN (' . implode( ', ', $this->collisions ) . ')';
 				}
 
 				if ( $table === 'posts' && !empty( $this->post_types ) && !$blog->is_network() )
 				{
-					$where[] = 'post_type not in (\'' . implode( '\', \'', $this->post_types ) . '\')';
+					$where[] = '`post_type` NOT IN (\'' . implode( '\', \'', $this->post_types ) . '\')';
 				}
 			}
 			else
 			{
 				if ( $blog->table( $table ) !== $GLOBALS['wpdb']->__get( $table ) )
 				{
-					$where[] = SQL_Table::ID_COLS[ $table ] . ' in (' . implode( ', ', $this->republished ) . ')';
+					$where[] = '`' . SQL_Table::ID_COLS[ $table ] . '` IN (' . implode( ', ', $this->republished ) . ')';
 				}
 			}
 
-			$tables[] = 'select * from ' . $blog->table( $table ) . ( empty( $where ) ? '' : ( ' where ' . implode( ' and ', $where ) ) );
+			$tables[] = 'SELECT * FROM `' . $blog->table( $table ) . ( empty( $where ) ? '`' : ( '` WHERE ' . implode( ' AND ', $where ) ) );
 		}
 
-		return implode( ' union ', $tables );
+		return implode( ' UNION ', $tables );
 	}
 
 	public function report_collisions()
@@ -158,7 +158,7 @@ class Network
 	/**
 	 * Constructor.
 	 *
-	 * Constructs the network.
+	 * Queries sent during this method do not get modified, as the filter is applied later.
 	 *
 	 * @since 1.0.4
 	 *
@@ -173,8 +173,8 @@ class Network
 
 		add_filter( 'admin_footer', array( $this, 'report_collisions' ) );
 
-		$this->collisions = $GLOBALS['wpdb']->get_col( 'select ID from (' . $this->union( 'posts' ) . ') posts group by ID having count(*) > 1 order by ID asc' );
-		$this->republished = $GLOBALS['wpdb']->get_col( 'select post_id from (' . $this->union( 'postmeta' ) . ') postmeta where meta_key = \'_supernetwork_share\' order by post_id desc' );
+		$this->collisions = $GLOBALS['wpdb']->get_col( 'SELECT `ID` FROM (' . $this->union( 'posts' ) . ') `posts` GROUP BY `ID` HAVING COUNT(*) > 1 ORDER BY `ID` ASC' );
+		$this->republished = $GLOBALS['wpdb']->get_col( 'SELECT `post_id` FROM (' . $this->union( 'postmeta' ) . ') `postmeta` WHERE `meta_key` = \'_supernetwork_share\' ORDER BY `post_id` DESC' );
 		$this->post_types = array_keys( (array) get_option( 'supernetwork_post_types' ) );
 
 		$this->page = new Settings_Page(
@@ -195,7 +195,7 @@ class Network
 		);
 
 		global $wpdb;
-		$results = $wpdb->get_results( "select distinct option_name from $wpdb->options where option_name not like '\_%' and option_name not like 'supernetwork\_%' order by option_name" );
+		$results = $wpdb->get_results( "SELECT DISTINCT `option_name` FROM $wpdb->options WHERE `option_name` NOT LIKE '\_%' AND `option_name` NOT LIKE 'supernetwork\_%' ORDER BY `option_name`" );
 		$labels = array();
 
 		foreach ( $results as $result )
@@ -274,25 +274,22 @@ class Network
 
 		if ( $this->consolidated )
 		{
+			$this->consolidated = false;
+
 			echo '<h2>Post ID Collisions</h2>';
 
-			if ( !empty( $this->collisions ) && isset( $_POST['supernetwork_post_collision_' . $this->collisions[0] ] ) )
+			if ( !empty( $this->collisions ) && isset( $_POST[ 'supernetwork_post_collision_' . $this->collisions[0] ] ) )
 			{
-				$this->consolidated = false;
-
 				foreach ( $this->blogs as $blog )
 				{
-					switch_to_blog( $blog->id );
-					
-					if ( empty( $GLOBALS['wpdb']->get_col( 'select ID from ' . $blog->table( 'posts' ) . ' where guid = \'' . $_POST['supernetwork_post_collision_' . $this->collisions[0] ] . '\' limit 1' ) ) )
+					if ( $blog->id !== (int) $_POST[ 'supernetwork_post_collision_' . $this->collisions[0] ] )
 					{
+						switch_to_blog( $blog->id );
 						wp_delete_post( (int) $this->collisions[0], true );
+						restore_current_blog();
 					}
-
-					restore_current_blog();
 				}
 
-				$this->consolidated = true;
 				array_shift( $this->collisions );
 			}
 
@@ -302,39 +299,37 @@ class Network
 			}
 			else
 			{
-				$old_collisions = $this->collisions;
-				$old_post_types = $this->post_types;
-
-				$this->collisions = array();
-				$this->post_types = array();
-
 				echo '<p>Consolidated mode is designed for fresh networks. When activated on an existing network, a large number of ID collisions are inevitable. However, you may be able to eliminate some collisions when the ID refers to a post of low importance, such as a revision or autosave.</p>';
 				echo '<p>The below table allows you to eliminate post ID collisions, one ID at a time. For each ID, you must select just ONE post to keep. All others with the same ID will be immediately and irretrievably deleted.</p>';
 
 				echo '<form method="post" action="">';
 				echo '<table class="widefat">';
-				echo '<thead><tr><th scope="col">Keep?</th><th scope="col">GUID</th><th scope="col">Post Title</th><th scope="col">Post Preview</th><th scope="col">Post Type</th><th scope="col">Post Status</th></tr></thead>';
+				echo '<thead><tr><th scope="col">Keep?</th><th scope="col">Site Containing Post</th><th scope="col">Post Title</th><th scope="col">Post Preview</th><th scope="col">Post Type</th><th scope="col">Post Status</th></tr></thead>';
 				echo '<tbody>';
 
-				foreach ( $GLOBALS['wpdb']->get_results( 'select guid, post_title, substring(post_content, 1, 500) as post_preview, post_type, post_status from ' . $GLOBALS['wpdb']->posts . ' where ID = ' . $old_collisions[0], ARRAY_A ) as $site )
+				foreach ( $this->blogs as $blog )
 				{
-					echo '<tr>';
-					echo '<td><input type="radio" id="supernetwork__' . esc_textarea( $site['guid'] ) . '" value="' . esc_textarea( $site['guid'] ) . '" name="supernetwork_post_collision_' . $old_collisions[0] . '"></td>';
-					echo '<td><label for="supernetwork__' . esc_textarea( $site['guid'] ) . '">' . esc_textarea( $site['guid'] ) . '</label></td>';
-					echo '<td><label for="supernetwork__' . esc_textarea( $site['guid'] ) . '">' . esc_textarea( $site['post_title'] ) . '</label></td>';
-					echo '<td><label for="supernetwork__' . esc_textarea( $site['guid'] ) . '">' . esc_textarea( $site['post_preview'] ) . '</label></td>';
-					echo '<td><label for="supernetwork__' . esc_textarea( $site['guid'] ) . '">' . esc_textarea( $site['post_type'] ) . '</label></td>';
-					echo '<td><label for="supernetwork__' . esc_textarea( $site['guid'] ) . '">' . esc_textarea( $site['post_status'] ) . '</label></td>';
-					echo '</tr>';
-				}
+					$row = $GLOBALS['wpdb']->get_row( 'SELECT `post_title`, SUBSTRING(`post_content`, 1, 500) AS `post_preview`, `post_type`, `post_status` FROM `' . $blog->table( 'posts' ) . '` WHERE `ID` = ' . $this->collisions[0], ARRAY_A );
 
-				$this->collisions = $old_collisions;
-				$this->post_types = $old_post_types;
+					if ( !empty( $row ) )
+					{
+						echo '<tr>';
+						echo '<td><input type="radio" id="supernetwork__' . esc_attr( $blog->id ) . '" value="' . esc_attr( $blog->id ) . '" name="supernetwork_post_collision_' . $this->collisions[0] . '"></td>';
+						echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '">' . esc_html( $blog->name ) . '</label></td>';
+						echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '">' . esc_html( $row['post_title'] ) . '</label></td>';
+						echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '">' . esc_html( $row['post_preview'] ) . '</label></td>';
+						echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '">' . esc_html( $row['post_type'] ) . '</label></td>';
+						echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '">' . esc_html( $row['post_status'] ) . '</label></td>';
+						echo '</tr>';
+					}
+				}
 
 				echo '</tbody></table>';
 				submit_button( 'Keep Selected and Delete All Others' );
 				echo '</form>';
 			}
+
+			$this->consolidated = true;
 		}
 		else
 		{
@@ -468,9 +463,8 @@ class Network
 
 	public function get_blog( $id )
 	{
-		if ( !in_array( (string) $id, $this->collisions, true ) )
+		if ( $this->consolidated && !in_array( (string) $id, $this->collisions, true ) )
 		{
-			$old_consolidated = $this->consolidated;
 			$old_republished = $this->republished;
 
 			$this->consolidated = false;
@@ -478,16 +472,16 @@ class Network
 
 			foreach ( $this->blogs as $blog )
 			{
-				if ( !empty( $GLOBALS['wpdb']->get_col( 'select ID from ' . $blog->table( 'posts' ) . ' where ID = ' . $id . ' limit 1' ) ) )
+				if ( !empty( $GLOBALS['wpdb']->get_col( 'SELECT `ID` FROM `' . $blog->table( 'posts' ) . '` WHERE `ID` = ' . $id . ' LIMIT 1' ) ) )
 				{
-					$this->consolidated = $old_consolidated;
+					$this->consolidated = true;
 					$this->republished = $old_republished;
 
 					return $blog;
 				}
 			}
 
-			$this->consolidated = $old_consolidated;
+			$this->consolidated = true;
 			$this->republished = $old_republished;
 		}
 

@@ -68,7 +68,7 @@ class SQL_Table extends SQL_Node
 					}
 				}
 
-				if ( $read_only && false === $node['alias'] )
+				if ( $read_only && isset( $node['alias'] ) && false === $node['alias'] )
 				{
 					$node['alias'] = array(
 						'as' => false,

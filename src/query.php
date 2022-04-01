@@ -187,9 +187,10 @@ class Query
 				{
 					case 'INSERT':
 						return new SQL_Table_For_Insert( $node, $this );
-					case 'DELETE':
 					case 'UPDATE':
 						return new SQL_Table( $node, $this, false );
+					case 'FROM':
+						return new SQL_Table( $node, $this, empty( $this->parsed['DELETE'] ) );
 					default:
 						return new SQL_Table( $node, $this );
 				}

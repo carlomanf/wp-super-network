@@ -37,6 +37,11 @@ class Blog
 		{
 			return $this->wp_site->site_id;
 		}
+
+		if ( $key === 'name' )
+		{
+			return $this->wp_site->blogname;
+		}
 	}
 	
 	public function table( $name )

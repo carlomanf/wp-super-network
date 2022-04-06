@@ -6,13 +6,6 @@ namespace WP_Super_Network;
 
 class SQL_Table extends SQL_Node
 {
-	const ID_COLS = array(
-		'comments' => 'comment_post_ID',
-		'postmeta' => 'post_id',
-		'posts' => 'ID',
-		'term_relationships' => 'object_id'
-	);
-
 	/**
 	 * Constructor.
 	 *
@@ -28,7 +21,7 @@ class SQL_Table extends SQL_Node
 
 		$table = array_reverse( $node['no_quotes']['parts'] )[0];
 
-		foreach ( array_keys( self::ID_COLS ) as $table_schema )
+		foreach ( array_unique( WP_Super_Network::TABLES_TO_REPLACE ) as $table_schema )
 		{
 			$local_table = $GLOBALS['wpdb']->__get( $table_schema );
 
@@ -39,7 +32,7 @@ class SQL_Table extends SQL_Node
 					continue;
 				}
 
-				if ( is_int( $query->post_id ) && $query->post_id_column === self::ID_COLS[ $table_schema ] )
+				if ( is_int( $query->post_id ) && WP_Super_Network::TABLES_TO_REPLACE[ $query->post_id_column ] === $table_schema )
 				{
 					$blog_to_replace = $query->network->get_blog( $query->post_id );
 				}

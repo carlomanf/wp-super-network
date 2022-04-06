@@ -63,7 +63,7 @@ class SQL_Bracket_Expression extends SQL_Node
 					}
 				}
 
-				if ( !isset( $this->post_id_column ) && $subnode['expr_type'] === 'colref' && in_array( ( $col = array_reverse( $subnode['no_quotes']['parts'] )[0] ), SQL_Table::ID_COLS, true ) )
+				if ( !isset( $this->post_id_column ) && $subnode['expr_type'] === 'colref' && isset( WP_Super_Network::TABLES_TO_REPLACE[ ( $col = array_reverse( $subnode['no_quotes']['parts'] )[0] ) ] ) )
 				{
 					$this->post_id_column = $col;
 					continue;

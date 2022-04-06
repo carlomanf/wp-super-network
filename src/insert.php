@@ -6,13 +6,6 @@ namespace WP_Super_Network;
 
 class SQL_Table_For_Insert extends SQL_Node
 {
-	const ID_COLS = array(
-		'comments' => 'comment_post_ID',
-		'postmeta' => 'post_id',
-		'posts' => 'post_parent',
-		'term_relationships' => 'object_id'
-	);
-
 	/**
 	 * Constructor.
 	 *
@@ -37,9 +30,9 @@ class SQL_Table_For_Insert extends SQL_Node
 			{
 				$col = array_reverse( $colref['no_quotes']['parts'] )[0];
 
-				if ( $colref['expr_type'] === 'colref' && in_array( $col, self::ID_COLS, true ) )
+				if ( $colref['expr_type'] === 'colref' && isset( WP_Super_Network::TABLES_TO_REPLACE[ $col ] ) )
 				{
-					$table_to_replace = array_search( $col, self::ID_COLS, true );
+					$table_to_replace = WP_Super_Network::TABLES_TO_REPLACE[ $col ];
 
 					if ( $GLOBALS['wpdb']->__get( $table_to_replace ) === $table )
 					{

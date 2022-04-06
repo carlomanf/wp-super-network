@@ -6,6 +6,14 @@ namespace WP_Super_Network;
 
 class WP_Super_Network
 {
+	const TABLES_TO_REPLACE = array(
+		'comment_post_ID' => 'comments',
+		'ID' => 'posts',
+		'object_id' => 'term_relationships',
+		'post_id' => 'postmeta',
+		'post_parent' => 'posts'
+	);
+
 	/**
 	 * Static instance of the plugin.
 	 */

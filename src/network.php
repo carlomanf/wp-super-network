@@ -125,7 +125,10 @@ class Network
 			{
 				if ( !empty( $this->collisions ) )
 				{
-					$where[] = '`' . SQL_Table::ID_COLS[ $table ] . '` NOT IN (' . implode( ', ', $this->collisions ) . ')';
+					foreach ( array_keys( WP_Super_Network::TABLES_TO_REPLACE, $table, true ) as $col )
+					{
+						$where[] = '`' . $col . '` NOT IN (' . implode( ', ', $this->collisions ) . ')';
+					}
 				}
 
 				if ( $table === 'posts' && !empty( $this->post_types ) && !$blog->is_network() )
@@ -137,7 +140,10 @@ class Network
 			{
 				if ( $blog->table( $table ) !== $GLOBALS['wpdb']->__get( $table ) )
 				{
-					$where[] = '`' . SQL_Table::ID_COLS[ $table ] . '` IN (' . implode( ', ', $this->republished ) . ')';
+					foreach ( array_keys( WP_Super_Network::TABLES_TO_REPLACE, $table, true ) as $col )
+					{
+						$where[] = '`' . $col . '` IN (' . implode( ', ', $this->republished ) . ')';
+					}
 				}
 			}
 

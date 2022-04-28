@@ -56,9 +56,21 @@ class WP_Super_Network
 	{
 		if ( !is_main_site() )
 		{
-			switch_to_blog( get_main_site_id() );
-			$value = get_option( $option, $default );
-			restore_current_blog();
+			$main = get_main_site_id();
+
+			if ( $main > 0 )
+			{
+				switch_to_blog( $main );
+				$value = get_option( $option, $default );
+				restore_current_blog();
+			}
+			else
+			{
+				if ( in_array( $option, array( 'supernetwork_consolidated', 'supernetwork_post_types', 'supernetwork_options' ), true ) )
+				{
+					$value = $default;
+				}
+			}
 
 			if ( $value === false )
 			{

@@ -32,7 +32,7 @@ class SQL_Table extends SQL_Node
 					continue;
 				}
 
-				if ( is_int( $query->post_id ) && WP_Super_Network::TABLES_TO_REPLACE[ $query->post_id_column ] === $table_schema )
+				if ( is_int( $query->post_id ) && is_string( $query->post_id_column ) && WP_Super_Network::TABLES_TO_REPLACE[ $query->post_id_column ] === $table_schema )
 				{
 					$blog_to_replace = $query->network->get_blog( $query->post_id );
 				}

@@ -121,10 +121,26 @@ class Query
 
 		try
 		{
-			$this->parsed = self::parser()->parse( $original );
+			$apostrophe = strpos( $original, '\\\'' );
+			$placeholder = null;
 
-			// Insert, update and delete queries are not currently modified.
+			if ( false !== $apostrophe && false !== strpos( $original, '--', $apostrophe ) )
+			{
+				$placeholder = uniqid( '', true );
+				$this->parsed = self::parser()->parse( str_replace( '\\\'', $placeholder, $original ) );
+			}
+			else
+			{
+				$this->parsed = self::parser()->parse( $original );
+			}
+
+			// Some queries are not modified.
 			$this->transformed = $this->transform( $this->parsed ) ? self::creator()->create( $this->parsed ) : $original;
+
+			if ( isset( $placeholder ) )
+			{
+				$this->transformed = str_replace( $placeholder, '\\\'', $this->transformed );
+			}
 		}
 		catch ( \PHPSQLParser\exceptions\UnsupportedFeatureException $uf )
 		{

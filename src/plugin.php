@@ -81,6 +81,36 @@ class WP_Super_Network
 		return $value;
 	}
 
+	public static function add_option( $option, $value )
+	{
+		if ( !is_main_site() && has_filter( 'pre_option_' . $option, array( __CLASS__, 'options' ) ) )
+		{
+			$main = get_main_site_id();
+
+			if ( $main > 0 && current_user_can_for_blog( $main, 'manage_options' ) )
+			{
+				switch_to_blog( $main );
+				add_option( $option, $value );
+				restore_current_blog();
+			}
+		}
+	}
+
+	public static function update_option( $option, $old_value, $value )
+	{
+		if ( !is_main_site() && has_filter( 'pre_option_' . $option, array( __CLASS__, 'options' ) ) )
+		{
+			$main = get_main_site_id();
+
+			if ( $main > 0 && current_user_can_for_blog( $main, 'manage_options' ) )
+			{
+				switch_to_blog( $main );
+				update_option( $option, $value );
+				restore_current_blog();
+			}
+		}
+	}
+
 	/**
 	 * Launch the initialization process.
 	 *
@@ -98,7 +128,7 @@ class WP_Super_Network
 		add_filter( 'wp_insert_post', array( $this->network, 'shared_auto_increment' ), 10, 3 );
 		add_filter( 'network_admin_menu', array( $this, 'summary' ) );
 
-		if ( is_main_site() ) $this->network->register_pages();
+		$this->network->register_pages();
 
 		// Complete this before accessing the option on next line
 		add_filter( 'pre_option_supernetwork_options', array( __CLASS__, 'options' ), 10, 3 );
@@ -112,6 +142,9 @@ class WP_Super_Network
 				add_filter( 'pre_option_' . $option, array( __CLASS__, 'options' ), 10, 3 );
 			}
 		}
+
+		add_filter( 'add_option', array( __CLASS__, 'add_option' ), 10, 2 );
+		add_filter( 'update_option', array( __CLASS__, 'update_option' ), 10, 3 );
 
 		$this->network->consolidated = !empty( get_option( 'supernetwork_consolidated' )['consolidated'] );
 

@@ -62,7 +62,7 @@ class SQL_Table_For_Insert extends SQL_Node
 			{
 				if ( $record['expr_type'] === 'record' && isset( $record['data'][ $position_to_check ] ) )
 				{
-					if ( $table_to_replace === 'posts' && isset( $post_type_position ) && in_array( substr( $record['data'][ $post_type_position ]['base_expr'], 1, -1 ), $query->network->post_types, true ) && ( $main = get_main_site_id() ) > 0 )
+					if ( $table_to_replace === 'posts' && isset( $post_type_position ) && $query->network->consolidated && in_array( substr( $record['data'][ $post_type_position ]['base_expr'], 1, -1 ), $query->network->post_types, true ) && ( $main = get_main_site_id() ) > 0 )
 					{
 						$blog_to_replace = new Blog( \WP_Site::get_instance( $main ) );
 					}
@@ -86,7 +86,7 @@ class SQL_Table_For_Insert extends SQL_Node
 			}
 		}
 
-		if ( !isset( $replaced_blog ) && isset( $_GET['blog_id'] ) && did_action( 'load-post-new.php' ) )
+		if ( !isset( $replaced_blog ) && $GLOBALS['wpdb']->__get( 'posts' ) === $table && $query->network->consolidated && isset( $_GET['blog_id'] ) && did_action( 'load-post-new.php' ) )
 		{
 			$replaced_blog = $query->network->get_blog_by_id( (int) $_GET['blog_id'] );
 		}

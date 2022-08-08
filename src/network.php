@@ -179,7 +179,7 @@ class Network
 	{
 		foreach ( get_sites( 'network_id=' . $network->id ) as $site )
 		{
-			array_push( $this->blogs, new Blog( $site ) );
+			$this->blogs[ (int) $site->blog_id ] = new Blog( $site );
 		}
 
 		add_filter( 'admin_footer', array( $this, 'report_collisions' ) );
@@ -258,6 +258,43 @@ class Network
 		$this->page->add( $section3 );
 		$this->page->add( $section2 );
 		$this->page->add( $section );
+	}
+
+	public function add_new_post( $hook_suffix )
+	{
+		$post_type = empty( $_GET['post_type'] ) ? 'post' : $_GET['post_type'];
+
+		if ( $hook_suffix === 'edit.php' && $this->consolidated && !in_array( $post_type, $this->post_types, true ) )
+		{
+			wp_enqueue_script(
+				'supernetwork-post-new',
+				SUPER_NETWORK_URL . 'assets/js/post-new.js',
+				array(),
+				null,
+				true
+			);
+
+			$blogs = array();
+			$type = get_post_type_object( $post_type );
+			$edit = isset( $post_type ) ? $type->cap->edit_posts : 'do_not_allow';
+			$create = isset( $post_type ) ? $type->cap->create_posts : 'do_not_allow';
+
+			foreach ( $this->blogs as $blog )
+			{
+				$id = $blog->id;
+
+				if ( current_user_can_for_blog( $id, $edit ) && current_user_can_for_blog( $id, $create ) )
+				{
+					$blogs[ $id ] = $blog->name;
+				}
+			}
+
+			wp_add_inline_script(
+				'supernetwork-post-new',
+				'var blogs = ' . json_encode( $blogs ) . '; var currentId = "' . get_current_blog_id() . '";',
+				'before'
+			);
+		}
 	}
 
 	public function post_types( $args, $field )
@@ -497,5 +534,10 @@ class Network
 		}
 
 		return null;
+	}
+
+	public function get_blog_by_id( $id )
+	{
+		return isset( $this->blogs[ $id ] ) ? $this->blogs[ $id ] : null;
 	}
 }

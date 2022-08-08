@@ -86,6 +86,11 @@ class SQL_Table_For_Insert extends SQL_Node
 			}
 		}
 
+		if ( !isset( $replaced_blog ) && isset( $_GET['blog_id'] ) && did_action( 'load-post-new.php' ) )
+		{
+			$replaced_blog = $query->network->get_blog_by_id( (int) $_GET['blog_id'] );
+		}
+
 		if ( isset( $replaced_blog ) )
 		{
 			$this->transformed['table'] = $replaced_blog->table( $table_to_replace );

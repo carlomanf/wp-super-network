@@ -85,6 +85,11 @@ class Network
 		{
 			return $this->republished;
 		}
+
+		if ( $key === 'post_types' )
+		{
+			return $this->post_types;
+		}
 	}
 
 	public function __set( $key, $value )

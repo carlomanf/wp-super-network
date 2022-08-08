@@ -20,36 +20,56 @@ class SQL_Table_For_Insert extends SQL_Node
 
 		$table = array_reverse( $node['no_quotes']['parts'] )[0];
 
-		$table_to_replace = false;
+		$table_to_replace = null;
 		$position_to_check = null;
+		$post_type_position = null;
 		$replaced_blog = null;
 
 		if ( is_array( $query->column_list ) )
 		{
 			foreach ( $query->column_list['sub_tree'] as $key => $colref )
 			{
-				$col = array_reverse( $colref['no_quotes']['parts'] )[0];
-
-				if ( $colref['expr_type'] === 'colref' && isset( WP_Super_Network::TABLES_TO_REPLACE[ $col ] ) )
+				if ( $colref['expr_type'] === 'colref' )
 				{
-					$table_to_replace = WP_Super_Network::TABLES_TO_REPLACE[ $col ];
+					$col = array_reverse( $colref['no_quotes']['parts'] )[0];
 
-					if ( $GLOBALS['wpdb']->__get( $table_to_replace ) === $table )
+					if ( 'post_type' === $col && $GLOBALS['wpdb']->__get( 'posts' ) === $table )
+					{
+						$post_type_position = $key;
+					}
+
+					if ( 'ID' !== $col && isset( WP_Super_Network::TABLES_TO_REPLACE[ $col ] ) )
+					{
+						$table_to_replace = WP_Super_Network::TABLES_TO_REPLACE[ $col ];
+					}
+
+					if ( isset( $table_to_replace ) && $GLOBALS['wpdb']->__get( $table_to_replace ) === $table )
 					{
 						$position_to_check = $key;
+					}
+
+					if ( isset( $position_to_check ) && ( isset( $post_type_position ) || $table !== 'posts' ) )
+					{
 						break;
 					}
 				}
 			}
 		}
 
-		if ( false !== $table_to_replace && isset( $position_to_check ) && isset( $query->parsed['VALUES'] ) )
+		if ( isset( $table_to_replace ) && isset( $position_to_check ) && isset( $query->parsed['VALUES'] ) )
 		{
 			foreach ( $query->parsed['VALUES'] as $record )
 			{
 				if ( $record['expr_type'] === 'record' && isset( $record['data'][ $position_to_check ] ) )
 				{
-					$blog_to_replace = $query->network->get_blog( (int) $record['data'][ $position_to_check ]['base_expr'] );
+					if ( $table_to_replace === 'posts' && isset( $post_type_position ) && in_array( substr( $record['data'][ $post_type_position ]['base_expr'], 1, -1 ), $query->network->post_types, true ) && ( $main = get_main_site_id() ) > 0 )
+					{
+						$blog_to_replace = new Blog( \WP_Site::get_instance( $main ) );
+					}
+					else
+					{
+						$blog_to_replace = $query->network->get_blog( (int) $record['data'][ $position_to_check ]['base_expr'] );
+					}
 
 					if ( is_null( $replaced_blog ) )
 					{
@@ -64,20 +84,20 @@ class SQL_Table_For_Insert extends SQL_Node
 					}
 				}
 			}
+		}
 
-			if ( isset( $replaced_blog ) )
-			{
-				$this->transformed['table'] = $replaced_blog->table( $table_to_replace );
+		if ( isset( $replaced_blog ) )
+		{
+			$this->transformed['table'] = $replaced_blog->table( $table_to_replace );
 
-				$this->transformed['no_quotes'] = array(
-					'delim' => false,
-					'parts' => array( $this->transformed['table'] )
-				);
+			$this->transformed['no_quotes'] = array(
+				'delim' => false,
+				'parts' => array( $this->transformed['table'] )
+			);
 
-				$this->transformed['base_expr'] = $this->transformed['table'];
+			$this->transformed['base_expr'] = $this->transformed['table'];
 
-				$this->modified = true;
-			}
+			$this->modified = true;
 		}
 	}
 }

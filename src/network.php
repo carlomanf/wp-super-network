@@ -464,15 +464,11 @@ class Network
 
 	public function intercept_permalink( $permalink, $post_ID )
 	{
-		// Prevent infinite loop
-		if ( empty( $GLOBALS['_wp_switched_stack'] ) )
+		if ( !doing_filter( 'supernetwork_preview_link' ) && !is_null( $blog = $this->get_blog( $post_ID ) ) && $blog->id !== get_current_blog_id() )
 		{
-			if ( !is_null( $blog = $this->get_blog( $post_ID ) ) )
-			{
-				switch_to_blog( $blog->id );
-				$permalink = get_permalink( $post_ID );
-				restore_current_blog();
-			}
+			switch_to_blog( $blog->id );
+			$permalink = get_permalink( $post_ID );
+			restore_current_blog();
 		}
 
 		return $permalink;
@@ -481,6 +477,18 @@ class Network
 	public function intercept_permalink_for_post( $permalink, $post )
 	{
 		return $this->intercept_permalink( $permalink, $post->ID );
+	}
+
+	public function intercept_preview_link( $preview_link, $post )
+	{
+		return doing_filter( 'supernetwork_preview_link' ) ? $preview_link : apply_filters( 'supernetwork_preview_link', $preview_link, $post );
+	}
+
+	public function replace_preview_link( $preview_link, $post )
+	{
+		$query_args = array();
+		parse_str( parse_url( $preview_link, PHP_URL_QUERY ), $query_args );
+		return get_preview_post_link( $post, array_intersect_key( $query_args, array( 'preview_nonce' => null, 'preview_id' => null ) ) );
 	}
 
 	public function intercept_capability( $allcaps, $caps, $args, $user )
@@ -498,7 +506,7 @@ class Network
 
 	public function singular_access( $false, $wp_query )
 	{
-		if ( $wp_query->is_singular() && !is_admin() && ( !defined( 'REST_REQUEST' ) || !REST_REQUEST ) && isset( $wp_query->post ) && !is_null( $blog = $this->get_blog( $wp_query->post->ID ) ) && get_current_blog_id() !== $blog->id )
+		if ( $wp_query->is_singular() && !is_admin() && ( !defined( 'REST_REQUEST' ) || !REST_REQUEST ) && !is_preview() && isset( $wp_query->post ) && !is_null( $blog = $this->get_blog( $wp_query->post->ID ) ) && get_current_blog_id() !== $blog->id )
 		{
 			$wp_query->set_404();
 			status_header( 404 );
@@ -507,6 +515,14 @@ class Network
 		}
 
 		return $false;
+	}
+
+	public function preview_access()
+	{
+		if ( is_preview() && !is_null( $blog = $this->get_blog( get_the_ID() ) ) && get_current_blog_id() !== $blog->id )
+		{
+			switch_to_blog( $blog->id );
+		}
 	}
 
 	public function get_blog( $id )

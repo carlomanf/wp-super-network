@@ -122,8 +122,11 @@ class WP_Super_Network
 		add_filter( 'post_type_link', array( $this->network, 'intercept_permalink_for_post' ), 10, 2 );
 		add_filter( 'post_link', array( $this->network, 'intercept_permalink_for_post' ), 10, 2 );
 		add_filter( 'page_link', array( $this->network, 'intercept_permalink' ), 10, 2 );
+		add_filter( 'preview_post_link', array( $this->network, 'intercept_preview_link' ), 10, 2 );
+		add_filter( 'supernetwork_preview_link', array( $this->network, 'replace_preview_link' ), 10, 2 );
 		add_filter( 'user_has_cap', array( $this->network, 'intercept_capability' ), 10, 4 );
 		add_filter( 'pre_handle_404', array( $this->network, 'singular_access' ), 10, 2 );
+		add_action( 'wp', array( $this->network, 'preview_access' ) );
 		add_filter( 'query', array( $this->network, 'intercept_query' ), 10, 2 );
 		add_filter( 'wp_insert_post', array( $this->network, 'shared_auto_increment' ), 10, 3 );
 		add_filter( 'admin_enqueue_scripts', array( $this->network, 'add_new_post' ) );

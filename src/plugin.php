@@ -118,28 +118,12 @@ class WP_Super_Network
 	 */
 	public function run()
 	{
-		// Load functions
-		add_filter( 'post_type_link', array( $this->network, 'intercept_permalink_for_post' ), 10, 2 );
-		add_filter( 'post_link', array( $this->network, 'intercept_permalink_for_post' ), 10, 2 );
-		add_filter( 'page_link', array( $this->network, 'intercept_permalink' ), 10, 2 );
-		add_filter( 'preview_post_link', array( $this->network, 'intercept_preview_link' ), 10, 2 );
-		add_filter( 'supernetwork_preview_link', array( $this->network, 'replace_preview_link' ), 10, 2 );
-		add_filter( 'user_has_cap', array( $this->network, 'intercept_capability' ), 10, 4 );
-		add_filter( 'pre_handle_404', array( $this->network, 'singular_access' ), 10, 2 );
-		add_action( 'wp', array( $this->network, 'preview_access' ) );
-		add_filter( 'query', array( $this->network, 'intercept_query' ), 10, 2 );
-		add_filter( 'wp_insert_post', array( $this->network, 'shared_auto_increment' ), 10, 3 );
-		add_filter( 'admin_enqueue_scripts', array( $this->network, 'add_new_post' ) );
-		add_filter( 'network_admin_menu', array( $this, 'summary' ) );
-
-		$this->network->register_pages();
-
 		// Complete this before accessing the option on next line
 		add_filter( 'pre_option_supernetwork_options', array( __CLASS__, 'options' ), 10, 3 );
 		add_filter( 'pre_option_supernetwork_post_types', array( __CLASS__, 'options' ), 10, 3 );
 		add_filter( 'pre_option_supernetwork_consolidated', array( __CLASS__, 'options' ), 10, 3 );
-		
-		foreach ( (array) get_option( 'supernetwork_options' ) as $option => $val )
+
+		foreach ( get_option( 'supernetwork_options', array() ) as $option => $val )
 		{
 			if ( $val && strpos( $option, '_' ) !== 0 && strpos( $option, 'supernetwork_' ) !== 0 )
 			{
@@ -150,7 +134,10 @@ class WP_Super_Network
 		add_filter( 'add_option', array( __CLASS__, 'add_option' ), 10, 2 );
 		add_filter( 'update_option', array( __CLASS__, 'update_option' ), 10, 3 );
 
-		$this->network->consolidated = !empty( get_option( 'supernetwork_consolidated' )['consolidated'] );
+		$this->network->register();
+
+		// Load functions
+		add_filter( 'network_admin_menu', array( $this, 'summary' ) );
 
 		if ( !$this->network->consolidated )
 		{

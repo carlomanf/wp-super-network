@@ -92,27 +92,6 @@ class Network
 		}
 	}
 
-	public function __set( $key, $value )
-	{
-		if ( $key === 'consolidated' )
-		{
-			if ( $value === true )
-			{
-				$this->consolidated = true;
-			}
-			
-			if ( $value === false )
-			{
-				$this->consolidated = false;
-
-				if ( !empty( $this->republished ) )
-				{
-					$this->set_auto_increment( $this->republished[0] + 1 );
-				}
-			}
-		}
-	}
-
 	public function union( $table )
 	{
 		if ( !$this->consolidated && empty( $this->republished ) )
@@ -181,12 +160,6 @@ class Network
 		{
 			$this->blogs[ (int) $site->blog_id ] = new Blog( $site );
 		}
-
-		add_filter( 'admin_footer', array( $this, 'report_collisions' ) );
-
-		$this->collisions = $GLOBALS['wpdb']->get_col( 'SELECT `ID` FROM (' . $this->union( 'posts' ) . ') `posts` GROUP BY `ID` HAVING COUNT(*) > 1 ORDER BY `ID` ASC' );
-		$this->republished = $GLOBALS['wpdb']->get_col( 'SELECT `post_id` FROM (' . $this->union( 'postmeta' ) . ') `postmeta` WHERE `meta_key` = \'_supernetwork_share\' ORDER BY `post_id` DESC' );
-		$this->post_types = array_keys( (array) get_option( 'supernetwork_post_types' ) );
 
 		$this->page = new Settings_Page(
 			array( 'supernetwork_options', 'supernetwork_post_types', 'supernetwork_consolidated' ),
@@ -310,9 +283,33 @@ class Network
 		return $args;
 	}
 
-	public function register_pages()
+	public function register()
 	{
 		$this->page->register();
+
+		add_filter( 'post_type_link', array( $this, 'intercept_permalink_for_post' ), 10, 2 );
+		add_filter( 'post_link', array( $this, 'intercept_permalink_for_post' ), 10, 2 );
+		add_filter( 'page_link', array( $this, 'intercept_permalink' ), 10, 2 );
+		add_filter( 'preview_post_link', array( $this, 'intercept_preview_link' ), 10, 2 );
+		add_filter( 'supernetwork_preview_link', array( $this, 'replace_preview_link' ), 10, 2 );
+		add_filter( 'user_has_cap', array( $this, 'intercept_capability' ), 10, 4 );
+		add_filter( 'pre_handle_404', array( $this, 'singular_access' ), 10, 2 );
+		add_action( 'wp', array( $this, 'preview_access' ) );
+		add_filter( 'query', array( $this, 'intercept_query' ), 10, 2 );
+		add_filter( 'wp_insert_post', array( $this, 'shared_auto_increment' ), 10, 3 );
+		add_filter( 'admin_enqueue_scripts', array( $this, 'add_new_post' ) );
+		add_filter( 'admin_footer', array( $this, 'report_collisions' ) );
+
+		$this->collisions = $GLOBALS['wpdb']->get_col( 'SELECT `ID` FROM (' . $this->union( 'posts' ) . ') `posts` GROUP BY `ID` HAVING COUNT(*) > 1 ORDER BY `ID` ASC' );
+		$this->republished = $GLOBALS['wpdb']->get_col( 'SELECT `post_id` FROM (' . $this->union( 'postmeta' ) . ') `postmeta` WHERE `meta_key` = \'_supernetwork_share\' ORDER BY `post_id` DESC' );
+		$this->post_types = array_keys( get_option( 'supernetwork_post_types', array() ) );
+
+		$this->consolidated = !empty( get_option( 'supernetwork_consolidated', array() )['consolidated'] );
+
+		if ( !$this->consolidated && !empty( $this->republished ) )
+		{
+			$this->set_auto_increment( $this->republished[0] + 1 );
+		}
 	}
 
 	public function page()

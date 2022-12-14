@@ -46,7 +46,7 @@ class Network
 	 */
 	private $page;
 
-	private $collisions = array();
+	private $collisions = array( 'posts' => array(), 'term_taxonomy' => array(), 'comments' => array() );
 	private $republished = array();
 	private $post_types = array();
 
@@ -76,9 +76,19 @@ class Network
 			return $this->consolidated;
 		}
 
-		if ( $key === 'collisions' )
+		if ( $key === 'post_collisions' )
 		{
-			return $this->collisions;
+			return $this->collisions['posts'];
+		}
+
+		if ( $key === 'term_collisions' )
+		{
+			return $this->collisions['term_taxonomy'];
+		}
+
+		if ( $key === 'comment_collisions' )
+		{
+			return $this->collisions['comments'];
 		}
 
 		if ( $key === 'republished' )
@@ -107,11 +117,11 @@ class Network
 
 			if ( $this->consolidated )
 			{
-				if ( !empty( $this->collisions ) )
+				if ( !empty( $this->collisions['posts'] ) )
 				{
 					foreach ( array_keys( WP_Super_Network::TABLES_TO_REPLACE, $table, true ) as $col )
 					{
-						$where[] = '`' . $col . '` NOT IN (' . implode( ', ', $this->collisions ) . ')';
+						$where[] = '`' . $col . '` NOT IN (' . implode( ', ', $this->collisions['posts'] ) . ')';
 					}
 				}
 
@@ -134,14 +144,31 @@ class Network
 			$tables[] = 'SELECT * FROM `' . $blog->table( $table ) . ( empty( $where ) ? '`' : ( '` WHERE ' . implode( ' AND ', $where ) ) );
 		}
 
-		return implode( ' UNION ', $tables );
+		return implode( ' UNION ALL ', $tables );
 	}
 
 	public function report_collisions()
 	{
-		if ( $this->consolidated && !empty( $this->collisions ) && current_user_can( 'manage_network_options' ) )
+		if ( $this->consolidated && ( !empty( $this->collisions['posts'] ) || !empty( $this->collisions['term_taxonomy'] ) || !empty( $this->collisions['comments'] ) ) && current_user_can( 'manage_network_options' ) )
 		{
-			echo '<div class="notice notice-error"><p><strong>WP Super Network detected ' . count( $this->collisions ) . ' post ID collisions</strong> across your network! These posts have been temporarily hidden. To access them again, please turn off consolidated mode.</p></div>';
+			echo '<div class="notice notice-error"><p><strong>WP Super Network detected ';
+
+			echo empty( $this->collisions['posts'] ) ? '' : count( $this->collisions['posts'] ) . ' post ID collisions';
+
+			if ( !empty( $this->collisions['posts'] ) && !empty( $this->collisions['term_taxonomy'] ) )
+			{
+				echo empty( $this->collisions['comments'] ) ? ' and ' : ', ';
+			}
+
+			echo empty( $this->collisions['term_taxonomy'] ) ? '' : count( $this->collisions['term_taxonomy'] ) . ' term ID collisions';
+
+			if ( !empty( $this->collisions['comments'] ) )
+			{
+				echo ( !empty( $this->collisions['posts'] ) || !empty( $this->collisions['term_taxonomy'] ) ) ? ' and ' : '';
+				echo count( $this->collisions['comments'] ) . ' comment ID collisions';
+			}
+
+			echo '</strong> across your network! These entities have been temporarily hidden. To access them again, please turn off consolidated mode.</p></div>';
 		}
 	}
 
@@ -300,7 +327,13 @@ class Network
 		add_filter( 'admin_enqueue_scripts', array( $this, 'add_new_post' ) );
 		add_filter( 'admin_footer', array( $this, 'report_collisions' ) );
 
-		$this->collisions = $GLOBALS['wpdb']->get_col( 'SELECT `ID` FROM (' . $this->union( 'posts' ) . ') `posts` GROUP BY `ID` HAVING COUNT(*) > 1 ORDER BY `ID` ASC' );
+		foreach ( array( 'posts' => 'ID', 'comments' => 'comment_ID', 'term_taxonomy' => 'term_taxonomy_id' ) as $entity => $id )
+		{
+			echo 'SELECT `' . $id . '` FROM (' . $this->union( $entity ) . ') `' . $entity . '` GROUP BY `' . $id . '` HAVING COUNT(*) > 1 ORDER BY `' . $id . '` ASC';
+			
+			$this->collisions[ $entity ] = $GLOBALS['wpdb']->get_col( 'SELECT `' . $id . '` FROM (' . $this->union( $entity ) . ') `' . $entity . '` GROUP BY `' . $id . '` HAVING COUNT(*) > 1 ORDER BY `' . $id . '` ASC' );
+		}
+
 		$this->republished = $GLOBALS['wpdb']->get_col( 'SELECT `post_id` FROM (' . $this->union( 'postmeta' ) . ') `postmeta` WHERE `meta_key` = \'_supernetwork_share\' ORDER BY `post_id` DESC' );
 		$this->post_types = array_keys( get_option( 'supernetwork_post_types', array() ) );
 
@@ -323,29 +356,29 @@ class Network
 
 			echo '<h2>Post ID Collisions</h2>';
 
-			if ( !empty( $this->collisions ) && isset( $_POST[ 'supernetwork_post_collision_' . $this->collisions[0] ] ) )
+			if ( !empty( $this->collisions['posts'] ) && isset( $_POST[ 'supernetwork_post_collision_' . $this->collisions['posts'][0] ] ) )
 			{
 				foreach ( $this->blogs as $blog )
 				{
-					if ( $blog->id !== (int) $_POST[ 'supernetwork_post_collision_' . $this->collisions[0] ] )
+					if ( $blog->id !== (int) $_POST[ 'supernetwork_post_collision_' . $this->collisions['posts'][0] ] )
 					{
 						switch_to_blog( $blog->id );
-						wp_delete_post( (int) $this->collisions[0], true );
+						wp_delete_post( (int) $this->collisions['posts'][0], true );
 						restore_current_blog();
 					}
 				}
 
-				array_shift( $this->collisions );
+				array_shift( $this->collisions['posts'] );
 			}
 
-			if ( empty( $this->collisions ) )
+			if ( empty( $this->collisions['posts'] ) )
 			{
 				echo '<p>No collisions on this network!</p>';
 			}
 			else
 			{
 				echo '<p>Consolidated mode is designed for fresh networks. When activated on an existing network, a large number of ID collisions are inevitable. However, you may be able to eliminate some collisions when the ID refers to a post of low importance, such as a revision or autosave.</p>';
-				echo '<p>The below table allows you to eliminate post ID collisions, one ID at a time. For each ID, you must select just ONE post to keep. All others with the same ID will be immediately and irretrievably deleted.</p>';
+				echo '<p>The below tables allow you to eliminate post, term and comment ID collisions, one ID at a time. For each ID, you must select just ONE entity to keep. All others with the same ID will be immediately and irretrievably deleted.</p>';
 
 				echo '<form method="post" action="">';
 				echo '<table class="widefat">';
@@ -354,12 +387,12 @@ class Network
 
 				foreach ( $this->blogs as $blog )
 				{
-					$row = $GLOBALS['wpdb']->get_row( 'SELECT `post_title`, SUBSTRING(`post_content`, 1, 500) AS `post_preview`, `post_type`, `post_status` FROM `' . $blog->table( 'posts' ) . '` WHERE `ID` = ' . $this->collisions[0], ARRAY_A );
+					$row = $GLOBALS['wpdb']->get_row( 'SELECT `post_title`, SUBSTRING(`post_content`, 1, 500) AS `post_preview`, `post_type`, `post_status` FROM `' . $blog->table( 'posts' ) . '` WHERE `ID` = ' . $this->collisions['posts'][0], ARRAY_A );
 
 					if ( !empty( $row ) )
 					{
 						echo '<tr>';
-						echo '<td><input type="radio" id="supernetwork__' . esc_attr( $blog->id ) . '" value="' . esc_attr( $blog->id ) . '" name="supernetwork_post_collision_' . $this->collisions[0] . '"></td>';
+						echo '<td><input type="radio" id="supernetwork__' . esc_attr( $blog->id ) . '" value="' . esc_attr( $blog->id ) . '" name="supernetwork_post_collision_' . $this->collisions['posts'][0] . '"></td>';
 						echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '">' . esc_html( $blog->name ) . '</label></td>';
 						echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '">' . esc_html( $row['post_title'] ) . '</label></td>';
 						echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '">' . esc_html( $row['post_preview'] ) . '</label></td>';
@@ -522,9 +555,9 @@ class Network
 		}
 	}
 
-	public function get_blog( $id )
+	public function get_blog( $id, $entity = 'posts' )
 	{
-		if ( $this->consolidated && !in_array( (string) $id, $this->collisions, true ) )
+		if ( $this->consolidated && !in_array( (string) $id, $this->collisions[ $entity ], true ) )
 		{
 			$old_republished = $this->republished;
 
@@ -533,7 +566,7 @@ class Network
 
 			foreach ( $this->blogs as $blog )
 			{
-				if ( !empty( $GLOBALS['wpdb']->get_col( 'SELECT `ID` FROM `' . $blog->table( 'posts' ) . '` WHERE `ID` = ' . $id . ' LIMIT 1' ) ) )
+				if ( !empty( $GLOBALS['wpdb']->get_col( 'SELECT `ID` FROM `' . $blog->table( $entity ) . '` WHERE `ID` = ' . $id . ' LIMIT 1' ) ) )
 				{
 					$this->consolidated = true;
 					$this->republished = $old_republished;

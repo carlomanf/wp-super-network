@@ -201,7 +201,7 @@ class WP_Super_Network
 		{
 			if ( current_user_can( 'edit_post', $post->ID ) )
 			{
-				if ( in_array( (string) $post->ID, $this->network->collisions, true ) )
+				if ( in_array( (string) $post->ID, $this->network->post_collisions, true ) || array_intersect( get_comments( 'fields=ids&post_id=' . $post->ID ), $this->network->comment_collisions ) !== array() )
 				{
 					$actions['republish'] = '<i style="color: #888;">' . __( 'Can&apos;t Republish', 'supernetwork' ) . '</i>';
 				}

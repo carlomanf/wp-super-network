@@ -327,7 +327,8 @@ class Network
 		add_filter( 'admin_enqueue_scripts', array( $this, 'add_new_post' ) );
 		add_filter( 'admin_footer', array( $this, 'report_collisions' ) );
 
-		foreach ( array( 'posts' => 'ID', 'comments' => 'comment_ID', 'term_taxonomy' => 'term_taxonomy_id' ) as $entity => $id )
+		// Comments must be queried before posts so as not to mask any comment ID collisions.
+		foreach ( array( 'comments' => 'comment_ID', 'term_taxonomy' => 'term_taxonomy_id', 'posts' => 'ID' ) as $entity => $id )
 		{
 			echo 'SELECT `' . $id . '` FROM (' . $this->union( $entity ) . ') `' . $entity . '` GROUP BY `' . $id . '` HAVING COUNT(*) > 1 ORDER BY `' . $id . '` ASC';
 			

@@ -201,7 +201,7 @@ class WP_Super_Network
 		{
 			if ( current_user_can( 'edit_post', $post->ID ) )
 			{
-				if ( in_array( (string) $post->ID, $this->network->post_collisions, true ) || array_intersect( get_comments( 'fields=ids&post_id=' . $post->ID ), $this->network->comment_collisions ) !== array() )
+				if ( in_array( (string) $post->ID, $this->network->post_collisions, true ) || array_intersect( wp_get_object_terms( $post->ID, array_keys( $GLOBALS['wp_taxonomies'] ), 'fields=ids' ), $this->network->term_collisions ) !== array() || array_intersect( get_comments( 'fields=ids&post_id=' . $post->ID ), $this->network->comment_collisions ) !== array() )
 				{
 					$actions['republish'] = '<i style="color: #888;">' . __( 'Can&apos;t Republish', 'supernetwork' ) . '</i>';
 				}

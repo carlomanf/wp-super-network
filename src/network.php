@@ -330,8 +330,6 @@ class Network
 		// Comments must be queried before posts so as not to mask any comment ID collisions.
 		foreach ( array( 'comments' => 'comment_ID', 'term_taxonomy' => 'term_taxonomy_id', 'posts' => 'ID' ) as $entity => $id )
 		{
-			echo 'SELECT `' . $id . '` FROM (' . $this->union( $entity ) . ') `' . $entity . '` GROUP BY `' . $id . '` HAVING COUNT(*) > 1 ORDER BY `' . $id . '` ASC';
-			
 			$this->collisions[ $entity ] = $GLOBALS['wpdb']->get_col( 'SELECT `' . $id . '` FROM (' . $this->union( $entity ) . ') `' . $entity . '` GROUP BY `' . $id . '` HAVING COUNT(*) > 1 ORDER BY `' . $id . '` ASC' );
 		}
 

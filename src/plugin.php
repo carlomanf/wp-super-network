@@ -6,12 +6,42 @@ namespace WP_Super_Network;
 
 class WP_Super_Network
 {
+	const ENTITIES_TO_REPLACE = array(
+		'comments' => array(),
+		'posts' => array(),
+		'term_taxonomy' => array(),
+		'terms' => array()
+	);
+
 	const TABLES_TO_REPLACE = array(
-		'comment_post_ID' => 'comments',
-		'ID' => 'posts',
-		'object_id' => 'term_relationships',
-		'post_id' => 'postmeta',
-		'post_parent' => 'posts'
+		'commentmeta' => array(
+			'comment_id' => 'comments'
+		),
+		'comments' => array(
+			'comment_ID' => 'comments',
+			'comment_post_ID' => 'posts'
+		),
+		'postmeta' => array(
+			'post_id' => 'posts'
+		),
+		'posts' => array(
+			'ID' => 'posts',
+			'post_parent' => 'posts'
+		),
+		'term_relationships' => array(
+			'object_id' => 'posts',
+			'term_taxonomy_id' => 'term_taxonomy'
+		),
+		'term_taxonomy' => array(
+			'term_id' => 'terms',
+			'term_taxonomy_id' => 'term_taxonomy'
+		),
+		'termmeta' => array(
+			'term_id' => 'terms'
+		),
+		'terms' => array(
+			'term_id' => 'terms'
+		)
 	);
 
 	/**

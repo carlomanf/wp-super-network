@@ -157,7 +157,7 @@ class Query
 	 *
 	 * @since 1.2.0
 	 *
-	 * @param string
+	 * @param string $key Key.
 	 */
 	public function __get( $key )
 	{
@@ -168,9 +168,32 @@ class Query
 			case 'parsed': return $this->parsed;
 			case 'network': return $this->network;
 			case 'column_list': return $this->column_list;
-			case 'post_id': return isset( $this->expressions['WHERE'] ) ? $this->expressions['WHERE']->post_id : null;
-			case 'post_id_column': return isset( $this->expressions['WHERE'] ) ? $this->expressions['WHERE']->post_id_column : null;
+			case 'replacements': return isset( $this->expressions['WHERE'] ) ? $this->expressions['WHERE']->replacements : WP_Super_Network::ENTITIES_TO_REPLACE;
 		}
+	}
+
+	/**
+	 * Checks if ID is set and an integer.
+	 *
+	 * @since 1.2.0
+	 *
+	 * @param array $data Entity replacement data.
+	 */
+	public function id_set( $data )
+	{
+		return array_key_exists( 'id', $data ) && is_int( $data['id'] );
+	}
+
+	/**
+	 * Checks if column is set and a string.
+	 *
+	 * @since 1.2.0
+	 *
+	 * @param array $data Entity replacement data.
+	 */
+	public function column_set( $data )
+	{
+		return array_key_exists( 'column', $data ) && is_string( $data['column'] );
 	}
 
 	/**
@@ -211,7 +234,8 @@ class Query
 						return new SQL_Table( $node, $this );
 				}
 			case 'bracket_expression':
-				return $this->expressions[ $clause ] = new SQL_Bracket_Expression( $node, $this, $clause );
+			case 'in-list':
+				return $this->expressions[ $clause ] = new SQL_Expression( $node, $this, $clause );
 			case 'subquery':
 				return new SQL_Subquery( $node, $this );
 			default:

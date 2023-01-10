@@ -46,7 +46,19 @@ class Network
 	 */
 	private $page;
 
-	private $collisions = array( 'posts' => array(), 'term_taxonomy' => array(), 'comments' => array() );
+	/**
+	 * Keeps track of ID collisions.
+	 *
+	 * @since 1.2.0
+	 * @var array
+	 */
+	private $collisions = array(
+		'comments' => array(),
+		'posts' => array(),
+		'term_taxonomy' => array(),
+		'terms' => array()
+	);
+
 	private $republished = array();
 	private $post_types = array();
 
@@ -104,6 +116,7 @@ class Network
 
 	public function union( $table )
 	{
+		// No need to do anything if not consolidated and no republished posts.
 		if ( !$this->consolidated && empty( $this->republished ) )
 		{
 			return $GLOBALS['wpdb']->__get( $table );
@@ -117,14 +130,19 @@ class Network
 
 			if ( $this->consolidated )
 			{
-				if ( !empty( $this->collisions['posts'] ) )
+				// Exclude any entities involved in collisions.
+				foreach ( array_keys( $this->collisions ) as $entity )
 				{
-					foreach ( array_keys( WP_Super_Network::TABLES_TO_REPLACE, $table, true ) as $col )
+					if ( !empty( $this->collisions[ $entity ] ) )
 					{
-						$where[] = '`' . $col . '` NOT IN (' . implode( ', ', $this->collisions['posts'] ) . ')';
+						foreach ( array_keys( WP_Super_Network::TABLES_TO_REPLACE[ $table ], $entity, true ) as $col )
+						{
+							$where[] = '`' . $col . '` NOT IN (' . implode( ', ', $this->collisions[ $entity ] ) . ')';
+						}
 					}
 				}
 
+				// Exclude network-based post types.
 				if ( $table === 'posts' && !empty( $this->post_types ) && !$blog->is_network() )
 				{
 					$where[] = '`post_type` NOT IN (\'' . implode( '\', \'', $this->post_types ) . '\')';
@@ -132,9 +150,10 @@ class Network
 			}
 			else
 			{
+				// Add republished posts.
 				if ( $blog->table( $table ) !== $GLOBALS['wpdb']->__get( $table ) )
 				{
-					foreach ( array_keys( WP_Super_Network::TABLES_TO_REPLACE, $table, true ) as $col )
+					foreach ( array_keys( WP_Super_Network::TABLES_TO_REPLACE[ $table ], 'posts', true ) as $col )
 					{
 						$where[] = '`' . $col . '` IN (' . implode( ', ', $this->republished ) . ')';
 					}
@@ -328,8 +347,12 @@ class Network
 		add_filter( 'admin_footer', array( $this, 'report_collisions' ) );
 
 		// Comments must be queried before posts so as not to mask any comment ID collisions.
-		foreach ( array( 'comments' => 'comment_ID', 'term_taxonomy' => 'term_taxonomy_id', 'posts' => 'ID' ) as $entity => $id )
+		// Taxonomy terms must be queried before terms so as not to mask any taxonomy term ID collisions.
+		foreach ( array_keys( $this->collisions ) as $entity )
 		{
+			// `ID` comes before `post_parent` in the `posts` sub-array, so `ID` will be correctly returned.
+			$id = array_search( $entity, WP_Super_Network::TABLES_TO_REPLACE[ $entity ], true );
+
 			$this->collisions[ $entity ] = $GLOBALS['wpdb']->get_col( 'SELECT `' . $id . '` FROM (' . $this->union( $entity ) . ') `' . $entity . '` GROUP BY `' . $id . '` HAVING COUNT(*) > 1 ORDER BY `' . $id . '` ASC' );
 		}
 
@@ -352,14 +375,15 @@ class Network
 		if ( $this->consolidated )
 		{
 			$this->consolidated = false;
+			$entity = 'posts';
 
 			echo '<h2>Post ID Collisions</h2>';
 
-			if ( !empty( $this->collisions['posts'] ) && isset( $_POST[ 'supernetwork_post_collision_' . $this->collisions['posts'][0] ] ) )
+			if ( !empty( $this->collisions[ $entity ] ) && isset( $_POST[ 'supernetwork_' . $entity . '_collision_' . $this->collisions[ $entity ][0] ] ) )
 			{
 				foreach ( $this->blogs as $blog )
 				{
-					if ( $blog->id !== (int) $_POST[ 'supernetwork_post_collision_' . $this->collisions['posts'][0] ] )
+					if ( $blog->id !== (int) $_POST[ 'supernetwork_' . $entity . '_collision_' . $this->collisions[ $entity ][0] ] )
 					{
 						switch_to_blog( $blog->id );
 						wp_delete_post( (int) $this->collisions['posts'][0], true );
@@ -367,10 +391,10 @@ class Network
 					}
 				}
 
-				array_shift( $this->collisions['posts'] );
+				array_shift( $this->collisions[ $entity ] );
 			}
 
-			if ( empty( $this->collisions['posts'] ) )
+			if ( empty( $this->collisions[ $entity ] ) )
 			{
 				echo '<p>No collisions on this network!</p>';
 			}
@@ -391,7 +415,7 @@ class Network
 					if ( !empty( $row ) )
 					{
 						echo '<tr>';
-						echo '<td><input type="radio" id="supernetwork__' . esc_attr( $blog->id ) . '" value="' . esc_attr( $blog->id ) . '" name="supernetwork_post_collision_' . $this->collisions['posts'][0] . '"></td>';
+						echo '<td><input type="radio" id="supernetwork__' . esc_attr( $blog->id ) . '" value="' . esc_attr( $blog->id ) . '" name="supernetwork_posts_collision_' . $this->collisions['posts'][0] . '"></td>';
 						echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '">' . esc_html( $blog->name ) . '</label></td>';
 						echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '">' . esc_html( $row['post_title'] ) . '</label></td>';
 						echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '">' . esc_html( $row['post_preview'] ) . '</label></td>';
@@ -558,6 +582,9 @@ class Network
 	{
 		if ( $this->consolidated && !in_array( (string) $id, $this->collisions[ $entity ], true ) )
 		{
+			// `ID` comes before `post_parent` in the `posts` sub-array, so `ID` will be correctly returned.
+			$col = array_search( $entity, WP_Super_Network::TABLES_TO_REPLACE[ $entity ], true );
+
 			$old_republished = $this->republished;
 
 			$this->consolidated = false;
@@ -565,7 +592,7 @@ class Network
 
 			foreach ( $this->blogs as $blog )
 			{
-				if ( !empty( $GLOBALS['wpdb']->get_col( 'SELECT `ID` FROM `' . $blog->table( $entity ) . '` WHERE `ID` = ' . $id . ' LIMIT 1' ) ) )
+				if ( !empty( $GLOBALS['wpdb']->get_col( 'SELECT `' . $col . '` FROM `' . $blog->table( $entity ) . '` WHERE `' . $col . '` = ' . $id . ' LIMIT 1' ) ) )
 				{
 					$this->consolidated = true;
 					$this->republished = $old_republished;

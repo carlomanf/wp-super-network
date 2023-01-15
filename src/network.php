@@ -52,12 +52,7 @@ class Network
 	 * @since 1.2.0
 	 * @var array
 	 */
-	private $collisions = array(
-		'comments' => array(),
-		'posts' => array(),
-		'term_taxonomy' => array(),
-		'terms' => array()
-	);
+	private $collisions = WP_Super_Network::ENTITIES_TO_REPLACE;
 
 	private $republished = array();
 	private $post_types = array();
@@ -168,22 +163,24 @@ class Network
 
 	public function report_collisions()
 	{
-		if ( $this->consolidated && ( !empty( $this->collisions['posts'] ) || !empty( $this->collisions['term_taxonomy'] ) || !empty( $this->collisions['comments'] ) ) && current_user_can( 'manage_network_options' ) )
+		$term_collisions = count( $this->collisions['term_taxonomy'] ) + count( $this->collisions['terms'] );
+
+		if ( $this->consolidated && ( !empty( $this->collisions['posts'] ) || $term_collisions > 0 || !empty( $this->collisions['comments'] ) ) && current_user_can( 'manage_network_options' ) )
 		{
 			echo '<div class="notice notice-error"><p><strong>WP Super Network detected ';
 
 			echo empty( $this->collisions['posts'] ) ? '' : count( $this->collisions['posts'] ) . ' post ID collisions';
 
-			if ( !empty( $this->collisions['posts'] ) && !empty( $this->collisions['term_taxonomy'] ) )
+			if ( !empty( $this->collisions['posts'] ) && $term_collisions > 0 )
 			{
 				echo empty( $this->collisions['comments'] ) ? ' and ' : ', ';
 			}
 
-			echo empty( $this->collisions['term_taxonomy'] ) ? '' : count( $this->collisions['term_taxonomy'] ) . ' term ID collisions';
+			echo $term_collisions > 0 ? $term_collisions . ' taxonomy term ID collisions' : '';
 
 			if ( !empty( $this->collisions['comments'] ) )
 			{
-				echo ( !empty( $this->collisions['posts'] ) || !empty( $this->collisions['term_taxonomy'] ) ) ? ' and ' : '';
+				echo ( !empty( $this->collisions['posts'] ) || $term_collisions > 0 ) ? ' and ' : '';
 				echo count( $this->collisions['comments'] ) . ' comment ID collisions';
 			}
 
@@ -367,6 +364,56 @@ class Network
 		}
 	}
 
+	/**
+	 * Selects an entity type to be first in line for collision elimination, based on a calculated score.
+	 *
+	 * The score for each entity type is the median ID of its collisions, divided by the median ID overall.
+	 * A score of 1 means the collisions are evenly distributed.
+	 * A lower score means the collisions are concentrated on the lower ID's, which are more likely to be older entities with more references and importance.
+	 *
+	 * The entity type with the lowest score is selected for collision elimination.
+	 *
+	 * @since 1.2.0
+	 */
+	private function get_entity_by_median_score()
+	{
+		// Temporarily empty collisions.
+		$old = $this->collisions;
+		$this->collisions = WP_Super_Network::ENTITIES_TO_REPLACE;
+		$scores = WP_Super_Network::ENTITIES_TO_REPLACE;
+
+		foreach ( $scores as $entity => &$score )
+		{
+			// `ID` comes before `post_parent` in the `posts` sub-array, so `ID` will be correctly returned.
+			$id = array_search( $entity, WP_Super_Network::TABLES_TO_REPLACE[ $entity ], true );
+
+			$collisions = $GLOBALS['wpdb']->get_col( 'SELECT `' . $id . '` FROM `' . $GLOBALS['wpdb']->__get( $entity ) . '` WHERE `' . $id . '` IN (SELECT `' . $id . '` FROM `' . $GLOBALS['wpdb']->__get( $entity ) . '` GROUP BY `' . $id . '` HAVING COUNT(*) > 1) ORDER BY `' . $id . '` ASC' );
+			$all = $GLOBALS['wpdb']->get_col( 'SELECT `' . $id . '` FROM `' . $GLOBALS['wpdb']->__get( $entity ) . '` ORDER BY `' . $id . '` ASC' );
+
+			$score = empty( $collisions ) ? PHP_FLOAT_MAX : $collisions[ floor( count( $collisions ) / 2 ) ] / $all[ floor( count( $all ) / 2 ) ];
+		}
+
+		$this->collisions = $old;
+		return array_search( min( $scores ), $scores );
+	}
+
+	/**
+	 * Force deletes a term from a taxonomy.
+	 *
+	 * @since 1.2.0
+	 */
+	private function force_delete_taxonomy_term( $term_id, $taxonomy )
+	{
+		// Temporarily register taxonomy to force deletion.
+		if ( !( $exists = taxonomy_exists( $taxonomy ) ) ) register_taxonomy( $taxonomy, array() );
+
+		// 0 is returned if the default term was not deleted.
+		$success = 0 !== wp_delete_term( $term_id, $taxonomy );
+
+		if ( !$exists ) unregister_taxonomy( $taxonomy );
+		return $success;
+	}
+
 	public function page()
 	{
 		echo '<div class="wrap">';
@@ -374,24 +421,52 @@ class Network
 
 		if ( $this->consolidated )
 		{
+			$entity = $this->get_entity_by_median_score();
 			$this->consolidated = false;
-			$entity = 'posts';
 
-			echo '<h2>Post ID Collisions</h2>';
+			echo '<h2>ID Collisions</h2>';
 
 			if ( !empty( $this->collisions[ $entity ] ) && isset( $_POST[ 'supernetwork_' . $entity . '_collision_' . $this->collisions[ $entity ][0] ] ) )
 			{
+				$success = true;
+
 				foreach ( $this->blogs as $blog )
 				{
-					if ( $blog->id !== (int) $_POST[ 'supernetwork_' . $entity . '_collision_' . $this->collisions[ $entity ][0] ] )
+					if ( $blog->id !== (int) explode( '_', $_POST[ 'supernetwork_' . $entity . '_collision_' . $this->collisions[ $entity ][0] ] )[0] )
 					{
 						switch_to_blog( $blog->id );
-						wp_delete_post( (int) $this->collisions['posts'][0], true );
+
+						if ( $entity === 'comments' ) wp_delete_comment( (int) $this->collisions['comments'][0], true );
+						if ( $entity === 'posts' ) wp_delete_post( (int) $this->collisions['posts'][0], true );
+
+						if ( $entity === 'term_taxonomy' )
+						{
+							$term = $GLOBALS['wpdb']->get_row( 'SELECT `taxonomy`, `term_id` FROM `' . $GLOBALS['wpdb']->term_taxonomy . '` WHERE `term_taxonomy_id` = ' . $this->collisions['term_taxonomy'][0], ARRAY_A );
+							$success = $this->force_delete_taxonomy_term( (int) $term['term_id'], $term['taxonomy'] ) && $success;
+						}
+
+						if ( $entity === 'terms' )
+						{
+							$results = $GLOBALS['wpdb']->get_results( 'SELECT `taxonomy`, `term_id` FROM `' . $GLOBALS['wpdb']->term_taxonomy . '` WHERE `term_id` = ' . $this->collisions['terms'][0] );
+
+							foreach ( $results as $result )
+							{
+								$success = $this->force_delete_taxonomy_term( (int) $result['term_id'], $result['taxonomy'] ) && $success;
+							}
+						}
+
 						restore_current_blog();
 					}
 				}
 
-				array_shift( $this->collisions[ $entity ] );
+				// Start again if collision was eliminated.
+				if ( $success )
+				{
+					array_shift( $this->collisions[ $entity ] );
+					$this->consolidated = true;
+					$entity = $this->get_entity_by_median_score();
+					$this->consolidated = false;
+				}
 			}
 
 			if ( empty( $this->collisions[ $entity ] ) )
@@ -400,27 +475,99 @@ class Network
 			}
 			else
 			{
+				// `ID` comes before `post_parent` in the `posts` sub-array, so `ID` will be correctly returned.
+				$id = array_search( $entity, WP_Super_Network::TABLES_TO_REPLACE[ $entity ], true );
+				$id = 'terms' === $entity ? 't.' . $id : $id;
+
+				$fields = array(
+					'comments' => array(
+						'post_title',
+						'comment_content',
+						'comment_author',
+						'comment_author_email'
+					),
+					'posts' => array(
+						'post_title',
+						'post_content',
+						'post_type',
+						'post_status'
+					),
+					'term_taxonomy' => array(
+						'name',
+						'description',
+						'taxonomy',
+						'count'
+					),
+					'terms' => array(
+						'name',
+						'description',
+						'taxonomy',
+						'count'
+					)
+				);
+
+				$labels = array(
+					'comments' => array(
+						'Site Containing Post/Comment',
+						'Post Containing Comment',
+						'Comment Preview',
+						'Comment Author',
+						'Comment Author Email'
+					),
+					'posts' => array(
+						'Site Containing Post',
+						'Post Title',
+						'Post Preview',
+						'Post Type',
+						'Post Status'
+					),
+					'term_taxonomy' => array(
+						'Site Containing Taxonomy Term',
+						'Taxonomy Term Name',
+						'Taxonomy Term Description',
+						'Taxonomy',
+						'Post Count'
+					),
+					'terms' => array(
+						'Site Containing Taxonomy Term',
+						'Taxonomy Term Name',
+						'Taxonomy Term Description',
+						'Taxonomy',
+						'Post Count'
+					)
+				);
+
 				echo '<p>Consolidated mode is designed for fresh networks. When activated on an existing network, a large number of ID collisions are inevitable. However, you may be able to eliminate some collisions when the ID refers to a post of low importance, such as a revision or autosave.</p>';
-				echo '<p>The below tables allow you to eliminate post, term and comment ID collisions, one ID at a time. For each ID, you must select just ONE entity to keep. All others with the same ID will be immediately and irretrievably deleted.</p>';
+				echo '<p>The below tables allow you to eliminate post, taxonomy term and comment ID collisions, one ID at a time. For each ID, you must select just ONE entity to keep. All others with the same ID will be immediately and irretrievably deleted.</p>';
+
+				if ( in_array( $entity, array( 'term_taxonomy', 'terms' ), true ) ) echo '<div class="notice notice-warning inline"><p><strong>Note:</strong> Default taxonomy terms can not be deleted! If a default taxonomy term is in a collision, you must go to Writing Settings and select a new default term for the taxonomy before you can eliminate the collision.</p></div>';
 
 				echo '<form method="post" action="">';
 				echo '<table class="widefat">';
-				echo '<thead><tr><th scope="col">Keep?</th><th scope="col">Site Containing Post</th><th scope="col">Post Title</th><th scope="col">Post Preview</th><th scope="col">Post Type</th><th scope="col">Post Status</th></tr></thead>';
+				echo '<thead><tr><th scope="col">Keep?</th><th scope="col">' . $labels[ $entity ][0] . '</th><th scope="col">' . $labels[ $entity ][1] . '</th><th scope="col">' . $labels[ $entity ][2] . '</th><th scope="col">' . $labels[ $entity ][3] . '</th><th scope="col">' . $labels[ $entity ][4] . '</th></tr></thead>';
 				echo '<tbody>';
 
 				foreach ( $this->blogs as $blog )
 				{
-					$row = $GLOBALS['wpdb']->get_row( 'SELECT `post_title`, SUBSTRING(`post_content`, 1, 500) AS `post_preview`, `post_type`, `post_status` FROM `' . $blog->table( 'posts' ) . '` WHERE `ID` = ' . $this->collisions['posts'][0], ARRAY_A );
+					$tables = array(
+						'comments' => $blog->table( 'comments' ) . ' LEFT JOIN ' . $blog->table( 'posts' ) . ' ON comment_post_ID = ID',
+						'posts' => $blog->table( 'posts' ),
+						'term_taxonomy' => $blog->table( 'term_taxonomy' ) . ' tt LEFT JOIN ' . $blog->table( 'terms' ) . ' t ON tt.term_id = t.term_id',
+						'terms' => $blog->table( 'term_taxonomy' ) . ' tt LEFT JOIN ' . $blog->table( 'terms' ) . ' t ON tt.term_id = t.term_id'
+					);
 
-					if ( !empty( $row ) )
+					$rows = $GLOBALS['wpdb']->get_results( 'SELECT `' . $fields[ $entity ][0] . '`, SUBSTRING(`' . $fields[ $entity ][1] . '`, 1, 500) AS `' . $fields[ $entity ][1] . '_preview`, `' . $fields[ $entity ][2] . '`, `' . $fields[ $entity ][3] . '` FROM ' . $tables[ $entity ] . ' WHERE `' . $id . '` = ' . $this->collisions[ $entity ][0], ARRAY_A );
+
+					// There may be more than one row if terms are not split.
+					foreach ( $rows as $key => $row )
 					{
 						echo '<tr>';
-						echo '<td><input type="radio" id="supernetwork__' . esc_attr( $blog->id ) . '" value="' . esc_attr( $blog->id ) . '" name="supernetwork_posts_collision_' . $this->collisions['posts'][0] . '"></td>';
-						echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '">' . esc_html( $blog->name ) . '</label></td>';
-						echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '">' . esc_html( $row['post_title'] ) . '</label></td>';
-						echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '">' . esc_html( $row['post_preview'] ) . '</label></td>';
-						echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '">' . esc_html( $row['post_type'] ) . '</label></td>';
-						echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '">' . esc_html( $row['post_status'] ) . '</label></td>';
+						echo '<td><input type="radio" id="supernetwork__' . esc_attr( $blog->id ) . '_' . $key . '" value="' . esc_attr( $blog->id ) . '" name="supernetwork_' . $entity . '_collision_' . $this->collisions[ $entity ][0] . '"></td>';
+						echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '_' . $key . '">' . esc_html( $blog->name ) . '</label></td>';
+						echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '_' . $key . '">' . esc_html( $row[ $fields[ $entity ][0] ] ) . '</label></td>';
+						echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '_' . $key . '">' . esc_html( $row[ $fields[ $entity ][1] . '_preview' ] ) . '</label></td>';
+						echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '_' . $key . '">' . esc_html( $row[ $fields[ $entity ][2] ] ) . '</label></td>';
+						echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '_' . $key . '">' . esc_html( $row[ $fields[ $entity ][3] ] ) . '</label></td>';
 						echo '</tr>';
 					}
 				}

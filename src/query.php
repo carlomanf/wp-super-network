@@ -266,16 +266,16 @@ class Query
 						$transform = array(
 							array(
 								'expr_type' => 'bracket_expression',
-								'base_expr' => implode( ' ', array_column( $parsed[ $key ], 'base_expr' ) ),
-								'sub_tree' => $parsed[ $key ]
+								'base_expr' => '(' . implode( ' ', array_column( $parsed[ $key ], 'base_expr' ) ) . ')',
+								'sub_tree' => &$parsed[ $key ]
 							)
 						);
 
-						$modified = $modified || $this->transform( $transform, $key );
+						$modified = $this->transform( $transform, $key ) || $modified;
 					}
 					else
 					{
-						$modified = $modified || $this->transform( $parsed[ $key ], $key );
+						$modified = $this->transform( $parsed[ $key ], $key ) || $modified;
 					}
 				}
 				else

@@ -20,7 +20,7 @@ class SQL_Subquery extends SQL_Node
 
 		if ( isset( $node['sub_tree'] ) )
 		{
-			$this->modified = $this->modified || $query->transform( $node['sub_tree'] );
+			$this->modified = $query->transform( $node['sub_tree'] ) || $this->modified;
 			$this->transformed = $node;
 		}
 	}

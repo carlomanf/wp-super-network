@@ -5,7 +5,7 @@
  * Description: Share content between sites and create offspring networks.
  * Version: 1.2.0-beta1
  * Requires at least: 5.0
- * Requires PHP: 5.6
+ * Requires PHP: 7.2
  * Author: Ask Carlo
  * Author URI: https://askcarlo.com
  * Text Domain: supernetwork

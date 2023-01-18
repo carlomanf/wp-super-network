@@ -35,15 +35,33 @@ class SQL_Table extends SQL_Node
 					return;
 				}
 
-				$replacements = $query->replacements;
+				$blog_to_replace = null;
 
-				// Replace the table if grounds for replacement.
-				foreach ( $tables as $column => $entity )
+				// Replace update/delete for meta tables.
+				$meta_ids = $query->meta_ids;
+
+				if ( !$read_only && in_array( $table_schema, array( 'commentmeta', 'postmeta', 'termmeta' ), true ) && !empty( $meta_ids ) && $meta_ids === $query->network->meta_ids() )
 				{
-					if ( $query->id_set( $replacements[ $entity ] ) && $query->column_set( $replacements[ $entity ] ) && $replacements[ $entity ]['column'] === $column )
+					$entity = str_replace( 'meta', 's', $table_schema );
+					$blog_to_replace = $query->network->get_blog( $query->network->meta_object_id(), $entity );
+				}
+
+				if ( isset( $blog_to_replace ) )
+				{
+					$query->network->pop_meta_ids();
+				}
+				else
+				{
+					$replacements = $query->replacements;
+
+					// Replace queries targeting a single entity.
+					foreach ( $tables as $column => $entity )
 					{
-						$blog_to_replace = $query->network->get_blog( $replacements[ $entity ]['id'], $entity );
-						break;
+						if ( $query->id_set( $replacements[ $entity ] ) && $query->column_set( $replacements[ $entity ] ) && $replacements[ $entity ]['column'] === $column )
+						{
+							$blog_to_replace = $query->network->get_blog( $replacements[ $entity ]['id'], $entity );
+							break;
+						}
 					}
 				}
 

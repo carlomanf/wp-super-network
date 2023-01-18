@@ -57,6 +57,8 @@ class Network
 	private $republished = array();
 	private $post_types = array();
 
+	private $meta_ids = array();
+
 	public function shared_auto_increment( $post_ID, $post, $update )
 	{
 		if ( !$update && $this->consolidated )
@@ -326,6 +328,32 @@ class Network
 		return $args;
 	}
 
+	private function push_meta_ids( $meta_ids, $object_id )
+	{
+		$this->meta_ids[] = array( $meta_ids, $object_id );
+	}
+
+	public function meta_ids()
+	{
+		return empty( $this->meta_ids ) ? array() : $this->meta_ids[ count( $this->meta_ids ) - 1 ][0];
+	}
+
+	public function meta_object_id()
+	{
+		return empty( $this->meta_ids ) ? 0 : $this->meta_ids[ count( $this->meta_ids ) - 1 ][1];
+	}
+
+	public function pop_meta_ids()
+	{
+		array_pop( $this->meta_ids );
+	}
+
+	public function delete_meta( $meta_ids, $object_id )
+	{
+		$this->push_meta_ids( $meta_ids, $object_id );
+		return $meta_ids;
+	}
+
 	public function register()
 	{
 		$this->page->register();
@@ -342,6 +370,9 @@ class Network
 		add_filter( 'wp_insert_post', array( $this, 'shared_auto_increment' ), 10, 3 );
 		add_filter( 'admin_enqueue_scripts', array( $this, 'add_new_post' ) );
 		add_filter( 'admin_footer', array( $this, 'report_collisions' ) );
+		add_filter( 'delete_comment_meta', array( $this, 'delete_meta' ), 10, 2 );
+		add_filter( 'delete_post_meta', array( $this, 'delete_meta' ), 10, 2 );
+		add_filter( 'delete_term_meta', array( $this, 'delete_meta' ), 10, 2 );
 
 		// Comments must be queried before posts so as not to mask any comment ID collisions.
 		// Taxonomy terms must be queried before terms so as not to mask any taxonomy term ID collisions.

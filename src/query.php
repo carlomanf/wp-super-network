@@ -169,6 +169,7 @@ class Query
 			case 'network': return $this->network;
 			case 'column_list': return $this->column_list;
 			case 'replacements': return isset( $this->expressions['WHERE'] ) ? $this->expressions['WHERE']->replacements : WP_Super_Network::ENTITIES_TO_REPLACE;
+			case 'meta_ids': return isset( $this->expressions['WHERE'] ) ? $this->expressions['WHERE']->meta_ids : array();
 		}
 	}
 

@@ -164,6 +164,14 @@ class WP_Super_Network
 		add_filter( 'add_option', array( __CLASS__, 'add_option' ), 10, 2 );
 		add_filter( 'update_option', array( __CLASS__, 'update_option' ), 10, 3 );
 
+		// Disable querying of meta ID. See issue #10
+		add_filter( 'update_comment_metadata_by_mid', '__return_false' );
+		add_filter( 'update_post_metadata_by_mid', '__return_false' );
+		add_filter( 'update_term_metadata_by_mid', '__return_false' );
+		add_filter( 'delete_comment_metadata_by_mid', '__return_false' );
+		add_filter( 'delete_post_metadata_by_mid', '__return_false' );
+		add_filter( 'delete_term_metadata_by_mid', '__return_false' );
+
 		$this->network->register();
 
 		// Load functions

@@ -15,6 +15,22 @@ class SQL_Expression extends SQL_Node
 	private $replacements = WP_Super_Network::ENTITIES_TO_REPLACE;
 
 	/**
+	 * Meta ID's that expression is specifying.
+	 *
+	 * @since 1.2.0
+	 * @var array
+	 */
+	private $meta_ids = array();
+
+	/**
+	 * Whether the meta ID column was found.
+	 *
+	 * @since 1.2.0
+	 * @var bool
+	 */
+	private $meta_id_column = false;
+
+	/**
 	 * Constructor.
 	 * Reads the expression to potentially suggest a table to be replaced.
 	 *
@@ -62,6 +78,10 @@ class SQL_Expression extends SQL_Node
 						if ( $query->column_set( $replacements[ $entity ] ) ) $data['column'] = $replacements[ $entity ]['column'];
 					}
 
+					// Update meta ID's.
+					$meta_ids = $query->meta_ids;
+					if ( !empty( $meta_ids ) ) $this->meta_ids = $meta_ids;
+
 					continue;
 				}
 
@@ -75,6 +95,9 @@ class SQL_Expression extends SQL_Node
 						{
 							$data = array();
 						}
+
+						$this->meta_ids = array();
+						$this->meta_id_column = false;
 
 						return;
 					}
@@ -98,14 +121,29 @@ class SQL_Expression extends SQL_Node
 						if ( !$query->column_set( $data ) && isset( $replacements[ $col ] ) && $replacements[ $col ] === $entity )
 						{
 							$data['column'] = $col;
+							$this->clear_meta_id();
 							continue 2;
 						}
+					}
+
+					// Meta ID column was found.
+					if ( $col === 'meta_id' )
+					{
+						$this->meta_id_column = true;
+						$this->clear_entity_id( $query );
+						continue;
 					}
 				}
 
 				// Update replacements based on a positive integer subnode.
 				if ( $subnode['expr_type'] === 'const' && (int) $subnode['base_expr'] > 0 )
 				{
+					// Add to meta ID's only if the column has not been found.
+					if ( !$this->meta_id_column )
+					{
+						$this->meta_ids[] = (string) $subnode['base_expr'];
+					}
+
 					$replaced = false;
 
 					foreach ( $this->replacements as $entity => &$data )
@@ -118,18 +156,49 @@ class SQL_Expression extends SQL_Node
 						}
 					}
 
-					if ( $replaced ) continue;
+					// Clear entity and/or meta if needed.
+					if ( $this->meta_id_column ) $this->clear_meta_id();
+					if ( !$replaced ) $this->clear_entity_id( $query );
+
+					continue;
 				}
 
-				// If this section is reached and ID and column were not both found, they should both be erased.
-				foreach ( $this->replacements as $entity => &$data )
-				{
-					if ( $query->id_set( $data ) xor $query->column_set( $data ) )
-					{
-						$data = array();
-					}
-				}
+				// If this section is reached, both entity and meta should be checked to potentially be cleared.
+				$this->clear_entity_id( $query );
+				$this->clear_meta_id();
 			}
+		}
+	}
+
+	/**
+	 * If an entity ID and column were not both found, they should both be erased.
+	 *
+	 * @since 1.2.0
+	 *
+	 * @param WP_Super_Network\Query $query Query context for this expression.
+	 */
+	private function clear_entity_id( $query )
+	{
+		foreach ( $this->replacements as $entity => &$data )
+		{
+			if ( $query->id_set( $data ) xor $query->column_set( $data ) )
+			{
+				$data = array();
+			}
+		}
+	}
+
+	/**
+	 * If a set of meta ID's and column were not both found, they should both be erased.
+	 *
+	 * @since 1.2.0
+	 */
+	private function clear_meta_id()
+	{
+		if ( !empty( $this->meta_ids ) xor $this->meta_id_column )
+		{
+			$this->meta_ids = array();
+			$this->meta_id_column = false;
 		}
 	}
 
@@ -145,6 +214,7 @@ class SQL_Expression extends SQL_Node
 		switch ( $key )
 		{
 			case 'replacements': return $this->replacements;
+			case 'meta_ids': return $this->meta_ids;
 		}
 
 		return parent::__get( $key );

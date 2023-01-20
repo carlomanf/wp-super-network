@@ -7,6 +7,33 @@ namespace WP_Super_Network;
 class SQL_Table_For_Insert extends SQL_Node
 {
 	/**
+	 * Sets the old blog variable to the new blog unless the old blog variable was already set.
+	 *
+	 * @since 1.2.0
+	 *
+	 * @param WP_Super_Network\Blog|null $old_blog Old blog, passed by reference.
+	 * @param WP_Super_Network\Blog|null $new_blog New blog, passed by reference.
+	 * 
+	 * @return bool Returns false if both were set to different blogs, or true in all other cases.
+	 */
+	private function blogs_match( &$old_blog, &$new_blog )
+	{
+		if ( !isset( $old_blog ) || !isset( $new_blog ) )
+		{
+			isset( $old_blog ) or $old_blog = $new_blog;
+		}
+		else
+		{
+			if ( $new_blog->id !== $old_blog->id )
+			{
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
 	 * Constructor.
 	 * Replaces the table with another table, depending on the values being inserted.
 	 *
@@ -21,11 +48,12 @@ class SQL_Table_For_Insert extends SQL_Node
 
 		$table = array_reverse( $node['no_quotes']['parts'] )[0];
 		$is_posts_table = $GLOBALS['wpdb']->__get( 'posts' ) === $table;
+		$is_relationships_table = $GLOBALS['wpdb']->__get( 'term_relationships' ) === $table;
 
 		$table_to_replace = null;
-		$entity_to_replace = null;
-		$position_to_check = null;
+		$entities_to_replace = array();
 		$post_type_position = null;
+		$blog_to_replace = null;
 		$replaced_blog = null;
 
 		if ( is_array( $query->column_list ) )
@@ -42,8 +70,7 @@ class SQL_Table_For_Insert extends SQL_Node
 						if ( isset( $tables[ $col ] ) && ( $table_schema !== $tables[ $col ] || $col === 'post_parent' ) && $GLOBALS['wpdb']->__get( $table_schema ) === $table )
 						{
 							$table_to_replace = $table_schema;
-							$entity_to_replace = $tables[ $col ];
-							$position_to_check = $key;
+							$entities_to_replace[ $tables[ $col ] ] = $key;
 							break;
 						}
 					}
@@ -55,7 +82,7 @@ class SQL_Table_For_Insert extends SQL_Node
 					}
 
 					// If all data is collected, stop scanning columns.
-					if ( isset( $position_to_check ) && ( isset( $post_type_position ) || !$is_posts_table ) )
+					if ( !empty( $entities_to_replace ) && !$is_relationships_table && ( isset( $post_type_position ) || !$is_posts_table ) )
 					{
 						break;
 					}
@@ -77,9 +104,21 @@ class SQL_Table_For_Insert extends SQL_Node
 					else
 					{
 						// Replace blog if a replaceable column was found.
-						if ( isset( $entity_to_replace ) && isset( $position_to_check ) && isset( $record['data'][ $position_to_check ] ) )
+						if ( !empty( $entities_to_replace ) )
 						{
-							$blog_to_replace = $query->network->get_blog( (int) $record['data'][ $position_to_check ]['base_expr'], $entity_to_replace );
+							foreach ( $entities_to_replace as $entity => $position )
+							{
+								if ( isset( $record['data'][ $position ] ) )
+								{
+									$suggested_blog = $query->network->get_blog( (int) $record['data'][ $position ]['base_expr'], $entity );
+
+									// If two columns are suggesting different blogs, the query can't be transformed.
+									if ( !$this->blogs_match( $blog_to_replace, $suggested_blog ) )
+									{
+										return;
+									}
+								}
+							}
 						}
 						else
 						{
@@ -87,17 +126,10 @@ class SQL_Table_For_Insert extends SQL_Node
 						}
 					}
 
-					if ( !isset( $replaced_blog ) )
+					// If two records need to be inserted into different blogs, the query can't be transformed.
+					if ( !$this->blogs_match( $replaced_blog, $blog_to_replace ) )
 					{
-						$replaced_blog = $blog_to_replace;
-					}
-					else
-					{
-						// If two records need to be inserted into different blogs, the query can't be transformed.
-						if ( $blog_to_replace->id !== $replaced_blog->id )
-						{
-							return;
-						}
+						return;
 					}
 				}
 			}

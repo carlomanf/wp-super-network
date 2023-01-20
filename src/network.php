@@ -453,7 +453,11 @@ class Network
 		if ( $this->consolidated )
 		{
 			$entity = $this->get_entity_by_median_score();
+
+			$old_republished = $this->republished;
+
 			$this->consolidated = false;
+			$this->republished = array();
 
 			echo '<h2>ID Collisions</h2>';
 
@@ -473,7 +477,11 @@ class Network
 						if ( $entity === 'term_taxonomy' )
 						{
 							$term = $GLOBALS['wpdb']->get_row( 'SELECT `taxonomy`, `term_id` FROM `' . $GLOBALS['wpdb']->term_taxonomy . '` WHERE `term_taxonomy_id` = ' . $this->collisions['term_taxonomy'][0], ARRAY_A );
-							$success = $this->force_delete_taxonomy_term( (int) $term['term_id'], $term['taxonomy'] ) && $success;
+
+							if ( isset( $term['term_id'] ) && isset( $term['taxonomy'] ) )
+							{
+								$success = $this->force_delete_taxonomy_term( (int) $term['term_id'], $term['taxonomy'] ) && $success;
+							}
 						}
 
 						if ( $entity === 'terms' )
@@ -609,6 +617,7 @@ class Network
 			}
 
 			$this->consolidated = true;
+			$this->republished = $old_republished;
 		}
 		else
 		{

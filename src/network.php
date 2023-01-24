@@ -54,6 +54,14 @@ class Network
 	 */
 	private $collisions = WP_Super_Network::ENTITIES_TO_REPLACE;
 
+	/**
+	 * Cache that maps ID's to blogs.
+	 *
+	 * @since 1.2.0
+	 * @var array
+	 */
+	private $blog_cache = WP_Super_Network::ENTITIES_TO_REPLACE;
+
 	private $republished = array();
 	private $post_types = array();
 
@@ -85,19 +93,9 @@ class Network
 			return $this->consolidated;
 		}
 
-		if ( $key === 'post_collisions' )
+		if ( $key === 'collisions' )
 		{
-			return $this->collisions['posts'];
-		}
-
-		if ( $key === 'term_collisions' )
-		{
-			return $this->collisions['term_taxonomy'];
-		}
-
-		if ( $key === 'comment_collisions' )
-		{
-			return $this->collisions['comments'];
+			return $this->collisions;
 		}
 
 		if ( $key === 'republished' )
@@ -381,13 +379,38 @@ class Network
 			// `ID` comes before `post_parent` in the `posts` sub-array, so `ID` will be correctly returned.
 			$id = array_search( $entity, WP_Super_Network::TABLES_TO_REPLACE[ $entity ], true );
 
-			$this->collisions[ $entity ] = $GLOBALS['wpdb']->get_col( 'SELECT `' . $id . '` FROM (' . $this->union( $entity ) . ') `' . $entity . '` GROUP BY `' . $id . '` HAVING COUNT(*) > 1 ORDER BY `' . $id . '` ASC' );
+			$this->collisions[ $entity ] = $GLOBALS['wpdb']->get_col( 'SELECT `' . $id . '` FROM `' . $GLOBALS['wpdb']->__get( $entity ) . '` GROUP BY `' . $id . '` HAVING COUNT(*) > 1 ORDER BY `' . $id . '` ASC' );
 		}
 
-		$this->republished = $GLOBALS['wpdb']->get_col( 'SELECT `post_id` FROM (' . $this->union( 'postmeta' ) . ') `postmeta` WHERE `meta_key` = \'_supernetwork_share\' ORDER BY `post_id` DESC' );
-		$this->post_types = array_keys( get_option( 'supernetwork_post_types', array() ) );
+		$consolidated = !empty( get_option( 'supernetwork_consolidated', array() )['consolidated'] );
 
-		$this->consolidated = !empty( get_option( 'supernetwork_consolidated', array() )['consolidated'] );
+		if ( !$consolidated )
+		{
+			$extra_where = '';
+			$relationships = $GLOBALS['wpdb']->term_relationships;
+			$taxonomy = $GLOBALS['wpdb']->term_taxonomy;
+
+			// The `AND 1=1` is to avoid a bug in the SQL parser caused by consecutive brackets.
+			empty( $this->collisions['comments'] ) or $extra_where .= ' AND `post_id` NOT IN (SELECT `comment_post_ID` FROM `' . $GLOBALS['wpdb']->comments . '` WHERE `comment_ID` IN (' . implode( ', ', $this->collisions[ 'comments' ] ) . ') AND 1=1)';
+			empty( $this->collisions['term_taxonomy'] ) or $extra_where .= ' AND `post_id` NOT IN (SELECT `object_id` FROM `' . $relationships . '` WHERE `term_taxonomy_id` IN (' . implode( ', ', $this->collisions[ 'term_taxonomy' ] ) . ') AND 1=1)';
+			empty( $this->collisions['terms'] ) or $extra_where .= ' AND `post_id` NOT IN (SELECT `object_id` FROM `' . $relationships . '` LEFT JOIN `' . $taxonomy . '` ON `' . $relationships . '`.`term_taxonomy_id` = `' . $taxonomy . '`.`term_taxonomy_id` WHERE `' . $relationships . '`.`term_taxonomy_id` NOT IN (' . implode( ', ', $this->collisions[ 'term_taxonomy' ] ) . ') AND `term_id` IN (' . implode( ', ', $this->collisions[ 'terms' ] ) . ') AND 1=1)';
+
+			// This query requires post collisions, but not the other collisions, to be recorded.
+			$old_comment_collisions = $this->collisions['comments'];
+			$old_taxonomy_term_collisions = $this->collisions['term_taxonomy'];
+			$old_term_collisions = $this->collisions['terms'];
+
+			foreach ( array( 'comments', 'term_taxonomy', 'terms' ) as $entity ) $this->collisions[ $entity ] = array();
+
+			$this->republished = $GLOBALS['wpdb']->get_col( 'SELECT DISTINCT `post_id` FROM `' . $GLOBALS['wpdb']->postmeta . '` WHERE `meta_key` = \'_supernetwork_share\'' . $extra_where . ' ORDER BY `post_id` DESC' );
+
+			$this->collisions['comments'] = $old_comment_collisions;
+			$this->collisions['term_taxonomy'] = $old_taxonomy_term_collisions;
+			$this->collisions['terms'] = $old_term_collisions;
+		}
+
+		$this->post_types = array_keys( get_option( 'supernetwork_post_types', array() ) );
+		$this->consolidated = $consolidated;
 
 		if ( !$this->consolidated && !empty( $this->republished ) )
 		{
@@ -454,10 +477,7 @@ class Network
 		{
 			$entity = $this->get_entity_by_median_score();
 
-			$old_republished = $this->republished;
-
 			$this->consolidated = false;
-			$this->republished = array();
 
 			echo '<h2>ID Collisions</h2>';
 
@@ -617,7 +637,6 @@ class Network
 			}
 
 			$this->consolidated = true;
-			$this->republished = $old_republished;
 		}
 		else
 		{
@@ -767,11 +786,17 @@ class Network
 
 	public function get_blog( $id, $entity = 'posts' )
 	{
-		if ( $this->consolidated && !in_array( (string) $id, $this->collisions[ $entity ], true ) )
+		if ( in_array( $entity, array_keys( WP_Super_Network::ENTITIES_TO_REPLACE ), true ) && !in_array( (string) $id, $this->collisions[ $entity ], true ) && ( $this->consolidated || !empty( $this->republished ) && $entity !== 'posts' || in_array( (string) $id, $this->republished, true ) ) )
 		{
+			if ( isset( $this->blog_cache[ $entity ][ $id ] ) ) return $this->blog_cache[ $entity ][ $id ];
+
+			$republished = null;
+			$extra_where = '';
+
 			// `ID` comes before `post_parent` in the `posts` sub-array, so `ID` will be correctly returned.
 			$col = array_search( $entity, WP_Super_Network::TABLES_TO_REPLACE[ $entity ], true );
 
+			$old_consolidated = $this->consolidated;
 			$old_republished = $this->republished;
 
 			$this->consolidated = false;
@@ -779,16 +804,25 @@ class Network
 
 			foreach ( $this->blogs as $blog )
 			{
-				if ( !empty( $GLOBALS['wpdb']->get_col( 'SELECT `' . $col . '` FROM `' . $blog->table( $entity ) . '` WHERE `' . $col . '` = ' . $id . ' LIMIT 1' ) ) )
+				if ( !$old_consolidated )
 				{
-					$this->consolidated = true;
+					isset( $republished ) or $republished = '(' . implode( ', ', $old_republished ) . ')';
+
+					$entity !== 'comments' or $extra_where = ' AND `comment_post_ID` IN ' . $republished;
+					$entity !== 'term_taxonomy' or $extra_where = ' AND EXISTS (SELECT * FROM `' . $blog->table( 'term_relationships' ) . '` WHERE `term_taxonomy_id` = ' . $id . ' AND `object_id` IN ' . $republished . ')';
+					$entity !== 'terms' or $extra_where = ' AND EXISTS (SELECT * FROM `' . $blog->table( 'term_relationships' ) . '` WHERE `term_taxonomy_id` IN (SELECT `term_taxonomy_id` FROM ' . $blog->table( 'term_taxonomy' ) . ' WHERE `term_id` = ' . $id . ') AND `object_id` IN ' . $republished . ')';
+				}
+
+				if ( !empty( $GLOBALS['wpdb']->get_col( 'SELECT `' . $col . '` FROM `' . $blog->table( $entity ) . '` WHERE `' . $col . '` = ' . $id . $extra_where . ' LIMIT 1' ) ) )
+				{
+					$this->consolidated = $old_consolidated;
 					$this->republished = $old_republished;
 
-					return $blog;
+					return $this->blog_cache[ $entity ][ $id ] = get_current_blog_id() !== $blog->id ? null : $blog;
 				}
 			}
 
-			$this->consolidated = true;
+			$this->consolidated = $old_consolidated;
 			$this->republished = $old_republished;
 		}
 

@@ -391,13 +391,20 @@ class Network
 		else
 		{
 			$extra_where = '';
+			$extra_where_2 = '';
 			$relationships = $GLOBALS['wpdb']->term_relationships;
 			$taxonomy = $GLOBALS['wpdb']->term_taxonomy;
 
 			// The `AND 1=1` is to avoid a bug in the SQL parser caused by consecutive brackets.
 			empty( $this->collisions['comments'] ) or $extra_where .= ' AND `post_id` NOT IN (SELECT `comment_post_ID` FROM `' . $GLOBALS['wpdb']->comments . '` WHERE `comment_ID` IN (' . implode( ', ', $this->collisions[ 'comments' ] ) . ') AND 1=1)';
-			empty( $this->collisions['term_taxonomy'] ) or $extra_where .= ' AND `post_id` NOT IN (SELECT `object_id` FROM `' . $relationships . '` WHERE `term_taxonomy_id` IN (' . implode( ', ', $this->collisions[ 'term_taxonomy' ] ) . ') AND 1=1)';
-			empty( $this->collisions['terms'] ) or $extra_where .= ' AND `post_id` NOT IN (SELECT `object_id` FROM `' . $relationships . '` LEFT JOIN `' . $taxonomy . '` ON `' . $relationships . '`.`term_taxonomy_id` = `' . $taxonomy . '`.`term_taxonomy_id` WHERE `' . $relationships . '`.`term_taxonomy_id` NOT IN (' . implode( ', ', $this->collisions[ 'term_taxonomy' ] ) . ') AND `term_id` IN (' . implode( ', ', $this->collisions[ 'terms' ] ) . ') AND 1=1)';
+
+			if ( !empty( $this->collisions['term_taxonomy'] ) )
+			{
+				$extra_where .= ' AND `post_id` NOT IN (SELECT `object_id` FROM `' . $relationships . '` WHERE `term_taxonomy_id` IN (' . implode( ', ', $this->collisions[ 'term_taxonomy' ] ) . ') AND 1=1)';
+				$extra_where_2 = ' AND `' . $relationships . '`.`term_taxonomy_id` NOT IN (' . implode( ', ', $this->collisions[ 'term_taxonomy' ] ) . ')';
+			}
+
+			empty( $this->collisions['terms'] ) or $extra_where .= ' AND `post_id` NOT IN (SELECT `object_id` FROM `' . $relationships . '` LEFT JOIN `' . $taxonomy . '` ON `' . $relationships . '`.`term_taxonomy_id` = `' . $taxonomy . '`.`term_taxonomy_id` WHERE `term_id` IN (' . implode( ', ', $this->collisions[ 'terms' ] ) . ')' . $extra_where_2 . ' AND 1=1)';
 
 			// This query requires post collisions, but not the other collisions, to be recorded.
 			$old_comment_collisions = $this->collisions['comments'];

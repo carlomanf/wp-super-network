@@ -35,34 +35,28 @@ class SQL_Table extends SQL_Node
 					return;
 				}
 
+				$use_union = true;
 				$blog_to_replace = null;
 
-				// Replace update/delete for meta tables.
+				$replacements = $query->replacements;
 				$meta_ids = $query->meta_ids;
 
-				if ( !$read_only && in_array( $table_schema, array( 'commentmeta', 'postmeta', 'termmeta' ), true ) && !empty( $meta_ids ) && $meta_ids === $query->network->meta_ids() )
+				// Replace queries targeting a single entity.
+				foreach ( $tables as $column => $entity )
 				{
-					$entity = str_replace( 'meta', 's', $table_schema );
-					$blog_to_replace = $query->network->get_blog( $query->network->meta_object_id(), $entity );
-				}
-
-				if ( isset( $blog_to_replace ) )
-				{
-					$query->network->pop_meta_ids();
-				}
-				else
-				{
-					$replacements = $query->replacements;
-
-					// Replace queries targeting a single entity.
-					foreach ( $tables as $column => $entity )
+					if ( $query->id_set( $replacements[ $entity ] ) && $query->column_set( $replacements[ $entity ] ) && $replacements[ $entity ]['column'] === $column )
 					{
-						if ( $query->id_set( $replacements[ $entity ] ) && $query->column_set( $replacements[ $entity ] ) && $replacements[ $entity ]['column'] === $column )
-						{
-							$blog_to_replace = $query->network->get_blog( $replacements[ $entity ]['id'], $entity );
-							break;
-						}
+						$blog_to_replace = $query->network->get_blog( $replacements[ $entity ]['id'], $entity );
+						$use_union = false;
+						break;
 					}
+				}
+
+				// Replace update/delete for meta tables.
+				if ( !isset( $blog_to_replace ) && !$read_only && in_array( $table_schema, array( 'commentmeta', 'postmeta', 'termmeta' ), true ) && !empty( $meta_ids ) && $meta_ids === $query->network->meta_ids() )
+				{
+					$blog_to_replace = $query->network->get_blog( $query->network->meta_object_id(), str_replace( 'meta', 's', $table_schema ) );
+					$query->network->pop_meta_ids();
 				}
 
 				// Replace the table with another blog.
@@ -80,7 +74,7 @@ class SQL_Table extends SQL_Node
 				else
 				{
 					// Replace the table with a union.
-					if ( $read_only )
+					if ( $read_only && $use_union )
 					{
 						$node['expr_type'] = 'subquery';
 						$node['base_expr'] = $union;
@@ -92,7 +86,7 @@ class SQL_Table extends SQL_Node
 				}
 
 				// For read only queries, add an alias if there is not already one.
-				if ( $read_only && isset( $node['alias'] ) && false === $node['alias'] )
+				if ( $read_only && ( $use_union || isset( $blog_to_replace ) ) && isset( $node['alias'] ) && false === $node['alias'] )
 				{
 					$node['alias'] = array(
 						'as' => false,
@@ -105,7 +99,7 @@ class SQL_Table extends SQL_Node
 					);
 				}
 
-				if ( $read_only || isset( $blog_to_replace ) )
+				if ( $read_only && $use_union || isset( $blog_to_replace ) )
 				{
 					$this->transformed = $node;
 					$this->modified = true;

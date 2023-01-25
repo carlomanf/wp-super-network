@@ -384,7 +384,11 @@ class Network
 
 		$consolidated = !empty( get_option( 'supernetwork_consolidated', array() )['consolidated'] );
 
-		if ( !$consolidated )
+		if ( $consolidated )
+		{
+			$this->post_types = array_keys( get_option( 'supernetwork_post_types', array() ) );
+		}
+		else
 		{
 			$extra_where = '';
 			$relationships = $GLOBALS['wpdb']->term_relationships;
@@ -409,7 +413,6 @@ class Network
 			$this->collisions['terms'] = $old_term_collisions;
 		}
 
-		$this->post_types = array_keys( get_option( 'supernetwork_post_types', array() ) );
 		$this->consolidated = $consolidated;
 
 		if ( !$this->consolidated && !empty( $this->republished ) )
@@ -723,7 +726,7 @@ class Network
 
 	public function intercept_permalink( $permalink, $post_ID )
 	{
-		if ( !doing_filter( 'supernetwork_preview_link' ) && !is_null( $blog = $this->get_blog( $post_ID ) ) && $blog->id !== get_current_blog_id() )
+		if ( !doing_filter( 'supernetwork_preview_link' ) && !is_null( $blog = $this->get_blog( $post_ID ) ) )
 		{
 			switch_to_blog( $blog->id );
 			$permalink = get_permalink( $post_ID );
@@ -765,7 +768,7 @@ class Network
 
 	public function singular_access( $false, $wp_query )
 	{
-		if ( $wp_query->is_singular() && !is_admin() && ( !defined( 'REST_REQUEST' ) || !REST_REQUEST ) && !is_preview() && isset( $wp_query->post ) && !is_null( $blog = $this->get_blog( $wp_query->post->ID ) ) && get_current_blog_id() !== $blog->id )
+		if ( $wp_query->is_singular() && !is_admin() && ( !defined( 'REST_REQUEST' ) || !REST_REQUEST ) && !is_preview() && isset( $wp_query->post ) && !is_null( $this->get_blog( $wp_query->post->ID ) ) )
 		{
 			$wp_query->set_404();
 			status_header( 404 );
@@ -778,7 +781,7 @@ class Network
 
 	public function preview_access()
 	{
-		if ( is_preview() && !is_null( $blog = $this->get_blog( get_the_ID() ) ) && get_current_blog_id() !== $blog->id )
+		if ( is_preview() && !is_null( $blog = $this->get_blog( get_the_ID() ) ) )
 		{
 			switch_to_blog( $blog->id );
 		}
@@ -788,13 +791,14 @@ class Network
 	{
 		if ( in_array( $entity, array_keys( WP_Super_Network::ENTITIES_TO_REPLACE ), true ) && !in_array( (string) $id, $this->collisions[ $entity ], true ) && ( $this->consolidated || !empty( $this->republished ) && $entity !== 'posts' || in_array( (string) $id, $this->republished, true ) ) )
 		{
-			if ( isset( $this->blog_cache[ $entity ][ $id ] ) ) return $this->blog_cache[ $entity ][ $id ];
+			if ( isset( $this->blog_cache[ $entity ][ $id ] ) ) return get_current_blog_id() === $this->blog_cache[ $entity ][ $id ]->id ? null : $this->blog_cache[ $entity ][ $id ];
 
 			$republished = null;
 			$extra_where = '';
 
 			// `ID` comes before `post_parent` in the `posts` sub-array, so `ID` will be correctly returned.
 			$col = array_search( $entity, WP_Super_Network::TABLES_TO_REPLACE[ $entity ], true );
+			$select = $entity === 'posts' ? 'post_type' : $col;
 
 			$old_consolidated = $this->consolidated;
 			$old_republished = $this->republished;
@@ -808,17 +812,20 @@ class Network
 				{
 					isset( $republished ) or $republished = '(' . implode( ', ', $old_republished ) . ')';
 
-					$entity !== 'comments' or $extra_where = ' AND `comment_post_ID` IN ' . $republished;
-					$entity !== 'term_taxonomy' or $extra_where = ' AND EXISTS (SELECT * FROM `' . $blog->table( 'term_relationships' ) . '` WHERE `term_taxonomy_id` = ' . $id . ' AND `object_id` IN ' . $republished . ')';
-					$entity !== 'terms' or $extra_where = ' AND EXISTS (SELECT * FROM `' . $blog->table( 'term_relationships' ) . '` WHERE `term_taxonomy_id` IN (SELECT `term_taxonomy_id` FROM ' . $blog->table( 'term_taxonomy' ) . ' WHERE `term_id` = ' . $id . ') AND `object_id` IN ' . $republished . ')';
+					// The `AND 1=1` is to avoid a bug in the SQL parser caused by consecutive brackets.
+					$entity !== 'comments' or $extra_where = ' AND `comment_post_ID` IN ' . $republished . ' AND 1=1';
+					$entity !== 'term_taxonomy' or $extra_where = ' AND EXISTS (SELECT * FROM `' . $blog->table( 'term_relationships' ) . '` WHERE `term_taxonomy_id` = ' . $id . ' AND `object_id` IN ' . $republished . ' AND 1=1)';
+					$entity !== 'terms' or $extra_where = ' AND EXISTS (SELECT * FROM `' . $blog->table( 'term_relationships' ) . '` WHERE `term_taxonomy_id` IN (SELECT `term_taxonomy_id` FROM ' . $blog->table( 'term_taxonomy' ) . ' WHERE `term_id` = ' . $id . ') AND `object_id` IN ' . $republished . ' AND 1=1)';
 				}
 
-				if ( !empty( $GLOBALS['wpdb']->get_col( 'SELECT `' . $col . '` FROM `' . $blog->table( $entity ) . '` WHERE `' . $col . '` = ' . $id . $extra_where . ' LIMIT 1' ) ) )
+				$result = $GLOBALS['wpdb']->get_var( 'SELECT `' . $select . '` FROM `' . $blog->table( $entity ) . '` WHERE `' . $col . '` = ' . $id . $extra_where . ' LIMIT 1' );
+
+				if ( !empty( $result ) )
 				{
 					$this->consolidated = $old_consolidated;
 					$this->republished = $old_republished;
 
-					return $this->blog_cache[ $entity ][ $id ] = get_current_blog_id() !== $blog->id ? null : $blog;
+					return $this->blog_cache[ $entity ][ $id ] = $this->consolidated && in_array( $result, $this->post_types, true ) && !$blog->is_network() ? null : $blog;
 				}
 			}
 
@@ -826,7 +833,7 @@ class Network
 			$this->republished = $old_republished;
 		}
 
-		return null;
+		return $this->blog_cache[ $entity ][ $id ] = null;
 	}
 
 	public function get_blog_by_id( $id )

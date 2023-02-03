@@ -1,7 +1,8 @@
 function supernetworkPostNew( selector )
 {
-	var extra = selector.value === currentId ? '' : '&blog_id=' + selector.value;
-	document.querySelector( '.page-title-action' ).attributes.href.value = originalURL + extra;
+	var url = new URL( originalURL );
+	selector.value === currentId || url.searchParams.append( 'blog_id', selector.value );
+	document.querySelector( '.page-title-action' ).attributes.href.value = url.toString();
 }
 
 var newHTML = '<select style="margin-top: -10px;" onchange="supernetworkPostNew(this);">';

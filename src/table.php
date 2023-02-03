@@ -29,13 +29,7 @@ class SQL_Table extends SQL_Node
 
 			if ( $table === $local_table )
 			{
-				// Nothing to replace.
-				if ( $read_only && ( $union = $query->network->union( $table_schema ) ) === $table )
-				{
-					return;
-				}
-
-				$use_union = true;
+				$use_union = !$read_only || ( $union = $query->network->union( $table_schema ) ) !== $table;
 				$blog_to_replace = null;
 
 				$replacements = $query->replacements;

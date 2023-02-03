@@ -112,7 +112,7 @@ class Network
 	public function union( $table )
 	{
 		// No need to do anything if not consolidated and no republished posts.
-		if ( !$this->consolidated && empty( $this->republished ) )
+		if ( !$this->consolidated && ( empty( $this->republished ) || empty( $post_cols = array_keys( WP_Super_Network::TABLES_TO_REPLACE[ $table ], 'posts', true ) ) ) )
 		{
 			return $GLOBALS['wpdb']->__get( $table );
 		}
@@ -148,9 +148,10 @@ class Network
 				// Add republished posts.
 				if ( $blog->table( $table ) !== $GLOBALS['wpdb']->__get( $table ) )
 				{
-					foreach ( array_keys( WP_Super_Network::TABLES_TO_REPLACE[ $table ], 'posts', true ) as $col )
+					foreach ( $post_cols as $col )
 					{
-						$where[] = '`' . $col . '` IN (' . implode( ', ', $this->republished ) . ')';
+						// Post parent is currently not being handled.
+						$col === 'post_parent' or $where[] = '`' . $col . '` IN (' . implode( ', ', $this->republished ) . ')';
 					}
 				}
 			}

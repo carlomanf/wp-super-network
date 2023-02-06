@@ -75,13 +75,39 @@ class Network
 		}
 	}
 
-	private function set_auto_increment( $new )
+	public function auto_increment_comments( $id, $comment )
+	{
+		if ( $this->consolidated || in_array( (string) $comment->comment_post_ID, $this->republished, true ) )
+		{
+			$this->set_auto_increment( $id + 1, 'comments' );
+		}
+	}
+
+	public function auto_increment_terms( $term_id, $tt_id, $taxonomy, $args )
+	{
+		if ( $this->consolidated )
+		{
+			$this->set_auto_increment( $tt_id + 1, 'term_taxonomy' );
+			$this->set_auto_increment( $term_id + 1, 'terms' );
+		}
+	}
+
+	public function auto_increment_term_relationships( $object_id, $tt_id, $taxonomy )
+	{
+		if ( !$this->consolidated && in_array( (string) $object_id, $this->republished, true ) )
+		{
+			$this->set_auto_increment( $tt_id + 1, 'term_taxonomy' );
+			$term = get_term_by( 'term_taxonomy_id', $tt_id ) and $this->set_auto_increment( $term->term_id + 1, 'terms' );
+		}
+	}
+
+	private function set_auto_increment( $new, $entity = 'posts' )
 	{
 		foreach ( $this->blogs as $blog )
 		{
-			if ( $new > (int) $GLOBALS['wpdb']->get_var( 'SELECT `auto_increment` FROM `information_schema`.`tables` WHERE `table_schema` = \'' . DB_NAME . '\' AND `table_name` = \'' . $blog->table( 'posts' ) . '\'' ) )
+			if ( $new > (int) $GLOBALS['wpdb']->get_var( 'SELECT `auto_increment` FROM `information_schema`.`tables` WHERE `table_schema` = \'' . DB_NAME . '\' AND `table_name` = \'' . $blog->table( $entity ) . '\'' ) )
 			{
-				$GLOBALS['wpdb']->query( 'ALTER TABLE `' . $blog->table( 'posts' ) . '` AUTO_INCREMENT = ' . (string) $new );
+				$GLOBALS['wpdb']->query( 'ALTER TABLE `' . $blog->table( $entity ) . '` AUTO_INCREMENT = ' . (string) $new );
 			}
 		}
 	}
@@ -367,6 +393,9 @@ class Network
 		add_action( 'wp', array( $this, 'preview_access' ) );
 		add_filter( 'query', array( $this, 'intercept_query' ), 10, 2 );
 		add_filter( 'wp_insert_post', array( $this, 'shared_auto_increment' ), 10, 3 );
+		add_filter( 'wp_insert_comment', array( $this, 'auto_increment_comments' ), 10, 2 );
+		add_filter( 'created_term', array( $this, 'auto_increment_terms' ), 10, 4 );
+		add_filter( 'added_term_relationship', array( $this, 'auto_increment_term_relationships' ), 10, 3 );
 		add_filter( 'admin_enqueue_scripts', array( $this, 'add_new_post' ) );
 		add_filter( 'admin_footer', array( $this, 'report_collisions' ) );
 		add_filter( 'delete_comment_meta', array( $this, 'delete_meta' ), 10, 2 );

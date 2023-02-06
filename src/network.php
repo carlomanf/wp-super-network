@@ -148,12 +148,9 @@ class Network
 		foreach ( $this->blogs as $blog )
 		{
 			$where = array();
+			$this->exclude( $where, $table, $blog );
 
-			if ( $this->consolidated )
-			{
-				$this->exclude( $where, $table, $blog );
-			}
-			else
+			if ( !$this->consolidated )
 			{
 				// Add republished posts.
 				if ( $blog->table( $table ) !== $GLOBALS['wpdb']->__get( $table ) )
@@ -174,24 +171,27 @@ class Network
 
 	public function exclude( &$where, $table, $blog, $alias = '' )
 	{
-		empty( $alias ) or $alias .= '.';
-
-		// Exclude any entities involved in collisions.
-		foreach ( array_keys( $this->collisions ) as $entity )
+		if ( $this->consolidated )
 		{
-			if ( !empty( $this->collisions[ $entity ] ) )
+			empty( $alias ) or $alias .= '.';
+
+			// Exclude any entities involved in collisions.
+			foreach ( array_keys( $this->collisions ) as $entity )
 			{
-				foreach ( array_keys( WP_Super_Network::TABLES_TO_REPLACE[ $table ], $entity, true ) as $col )
+				if ( !empty( $this->collisions[ $entity ] ) )
 				{
-					$where[] = $alias . '`' . $col . '` NOT IN (' . implode( ', ', $this->collisions[ $entity ] ) . ')';
+					foreach ( array_keys( WP_Super_Network::TABLES_TO_REPLACE[ $table ], $entity, true ) as $col )
+					{
+						$where[] = $alias . '`' . $col . '` NOT IN (' . implode( ', ', $this->collisions[ $entity ] ) . ')';
+					}
 				}
 			}
-		}
 
-		// Exclude network-based post types.
-		if ( $table === 'posts' && !empty( $this->post_types ) && !$blog->is_network() )
-		{
-			$where[] = $alias . '`post_type` NOT IN (\'' . implode( '\', \'', $this->post_types ) . '\')';
+			// Exclude network-based post types.
+			if ( $table === 'posts' && !empty( $this->post_types ) && !$blog->is_network() )
+			{
+				$where[] = $alias . '`post_type` NOT IN (\'' . implode( '\', \'', $this->post_types ) . '\')';
+			}
 		}
 	}
 

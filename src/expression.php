@@ -48,41 +48,29 @@ class SQL_Expression extends SQL_Node
 		{
 			foreach ( $node['sub_tree'] as &$subnode )
 			{
-				// Subqueries must use a different query instance.
-				if ( $subnode['expr_type'] === 'subquery' )
-				{
-					$old = $subnode['base_expr'];
-					$subquery = new Query( trim( $subnode['base_expr'], '()' ), $query->network );
-					$subnode['base_expr'] = '(' . $subquery->transformed . ')';
-
-					if ( $subnode['base_expr'] !== $old )
-					{
-						$subnode['sub_tree'] = $subquery->parsed;
-						$this->transformed = $node;
-						$this->modified = true;
-					}
-				}
-
 				// Nested expressions to be transformed recursively.
-				if ( $subnode['expr_type'] === 'bracket_expression' || $subnode['expr_type'] === 'in-list' )
+				if ( in_array( $subnode['expr_type'], array( 'bracket_expression', 'in-list', 'subquery' ), true ) )
 				{
 					$transform = array( &$subnode );
 					$this->modified = $query->transform( $transform, $clause ) || $this->modified;
 					$this->transformed = $node;
 
-					// Update replacements based on transformed expression.
-					foreach ( $this->replacements as $entity => &$data )
+					if ( $subnode['expr_type'] !== 'subquery' )
 					{
-						$replacements = $query->replacements;
-						if ( $query->id_set( $replacements[ $entity ] ) ) $data['id'] = $replacements[ $entity ]['id'];
-						if ( $query->column_set( $replacements[ $entity ] ) ) $data['column'] = $replacements[ $entity ]['column'];
+						// Update replacements based on transformed expression.
+						foreach ( $this->replacements as $entity => &$data )
+						{
+							$replacements = $query->replacements;
+							if ( $query->id_set( $replacements[ $entity ] ) ) $data['id'] = $replacements[ $entity ]['id'];
+							if ( $query->column_set( $replacements[ $entity ] ) ) $data['column'] = $replacements[ $entity ]['column'];
+						}
+
+						// Update meta ID's.
+						$meta_ids = $query->meta_ids;
+						if ( !empty( $meta_ids ) ) $this->meta_ids = $meta_ids;
+
+						continue;
 					}
-
-					// Update meta ID's.
-					$meta_ids = $query->meta_ids;
-					if ( !empty( $meta_ids ) ) $this->meta_ids = $meta_ids;
-
-					continue;
 				}
 
 				// Update replacements based on an operator subnode.

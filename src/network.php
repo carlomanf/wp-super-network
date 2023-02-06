@@ -151,23 +151,7 @@ class Network
 
 			if ( $this->consolidated )
 			{
-				// Exclude any entities involved in collisions.
-				foreach ( array_keys( $this->collisions ) as $entity )
-				{
-					if ( !empty( $this->collisions[ $entity ] ) )
-					{
-						foreach ( array_keys( WP_Super_Network::TABLES_TO_REPLACE[ $table ], $entity, true ) as $col )
-						{
-							$where[] = '`' . $col . '` NOT IN (' . implode( ', ', $this->collisions[ $entity ] ) . ')';
-						}
-					}
-				}
-
-				// Exclude network-based post types.
-				if ( $table === 'posts' && !empty( $this->post_types ) && !$blog->is_network() )
-				{
-					$where[] = '`post_type` NOT IN (\'' . implode( '\', \'', $this->post_types ) . '\')';
-				}
+				$this->exclude( $where, $table, $blog );
 			}
 			else
 			{
@@ -186,6 +170,29 @@ class Network
 		}
 
 		return implode( ' UNION ALL ', $tables );
+	}
+
+	public function exclude( &$where, $table, $blog, $alias = '' )
+	{
+		empty( $alias ) or $alias .= '.';
+
+		// Exclude any entities involved in collisions.
+		foreach ( array_keys( $this->collisions ) as $entity )
+		{
+			if ( !empty( $this->collisions[ $entity ] ) )
+			{
+				foreach ( array_keys( WP_Super_Network::TABLES_TO_REPLACE[ $table ], $entity, true ) as $col )
+				{
+					$where[] = $alias . '`' . $col . '` NOT IN (' . implode( ', ', $this->collisions[ $entity ] ) . ')';
+				}
+			}
+		}
+
+		// Exclude network-based post types.
+		if ( $table === 'posts' && !empty( $this->post_types ) && !$blog->is_network() )
+		{
+			$where[] = $alias . '`post_type` NOT IN (\'' . implode( '\', \'', $this->post_types ) . '\')';
+		}
 	}
 
 	public function report_collisions()
@@ -862,7 +869,8 @@ class Network
 					$this->consolidated = $old_consolidated;
 					$this->republished = $old_republished;
 
-					return $this->blog_cache[ $entity ][ $id ] = $this->consolidated && in_array( $result, $this->post_types, true ) && !$blog->is_network() ? null : $blog;
+					$this->blog_cache[ $entity ][ $id ] = $this->consolidated && in_array( $result, $this->post_types, true ) && !$blog->is_network() ? null : $blog;
+					return get_current_blog_id() === $blog->id ? null : $this->blog_cache[ $entity ][ $id ];
 				}
 			}
 

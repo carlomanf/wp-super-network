@@ -62,8 +62,6 @@ class SQL_Table extends SQL_Node
 						'delim' => false,
 						'parts' => array( $node['table'] )
 					);
-
-					$node['base_expr'] = $node['table'];
 				}
 				else
 				{
@@ -93,7 +91,23 @@ class SQL_Table extends SQL_Node
 					);
 				}
 
-				if ( $read_only && $use_union || isset( $blog_to_replace ) )
+				if ( isset( $blog_to_replace ) && isset( $node['table'] ) && isset( $node['alias'] ) && isset( $node['alias']['base_expr'] ) )
+				{
+					$node['base_expr'] = $node['table'] . ' ' . $node['alias']['base_expr'];
+				}
+
+				$where = array();
+
+				// Exclude collisions and network-based post types.
+				if ( !$use_union )
+				{
+					$blog = isset( $blog_to_replace ) ? $blog_to_replace : $query->network->get_blog_by_id( get_current_blog_id() );
+					$alias = isset( $node['alias'] ) && !empty( $node['alias']['name'] ) ? $node['alias']['name'] : $local_table;
+					$query->network->exclude( $where, $table_schema, $blog, $alias );
+					empty( $where ) or $query->condition( implode( ' AND ', $where ) );
+				}
+
+				if ( $read_only && $use_union || isset( $blog_to_replace ) || !empty( $where ) )
 				{
 					$this->transformed = $node;
 					$this->modified = true;

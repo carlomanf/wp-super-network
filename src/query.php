@@ -238,7 +238,7 @@ class Query
 			case 'in-list':
 				return $this->expressions[ $clause ] = new SQL_Expression( $node, $this, $clause );
 			case 'subquery':
-				return new SQL_Subquery( $node, $this );
+				return new SQL_Subquery( $node, $this, $clause );
 			default:
 				return new SQL_Node( $node );
 		}
@@ -289,5 +289,39 @@ class Query
 		}
 
 		return $modified;
+	}
+
+	/**
+	 * Add a condition to the WHERE clause of this query.
+	 * Does not check whether the query type supports a WHERE clause.
+	 *
+	 * @since 1.2.0
+	 *
+	 * @param string $expression SQL expression to add to the query.
+	 */
+	public function condition( $expression )
+	{
+		if ( !isset( $this->transformed ) )
+		{
+			$parsed = self::parser()->parse( 'WHERE ' . $expression );
+
+			if ( isset( $parsed['WHERE'] ) )
+			{
+				if ( isset( $this->parsed['WHERE'] ) )
+				{
+					$this->parsed['WHERE'][] = array(
+						'expr_type' => 'operator',
+						'base_expr' => 'AND',
+						'sub_tree' => false
+					);
+
+					$this->parsed['WHERE'] = array_merge( $this->parsed['WHERE'], $parsed['WHERE'] );
+				}
+				else
+				{
+					$this->parsed['WHERE'] = $parsed['WHERE'];
+				}
+			}
+		}
 	}
 }

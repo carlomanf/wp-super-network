@@ -2,7 +2,7 @@
 Contributors: manfcarlo
 Tags: network, multisite, share, sharing, move, migrate, migration, duplicate, syndication, content, management
 Tested up to: 5.9
-Stable tag: 1.1.0
+Stable tag: 1.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -39,7 +39,7 @@ To flag posts and pages for republication, access the Posts or Pages screen in W
 
 = How do I republish a page to the whole network? =
 
-As of version 1.0.5, you could flag any post or page on a main site for republication by finding it on the Posts or Pages screen and clicking Republish, but it would not take any effect. Version 1.1.0 now implements the behaviour of this feature!
+Flag any post or page on a main site for republication by finding it on the Posts or Pages screen and clicking Republish.
 
 After you have republished the post or page, it will start showing up across every site on your network. You can also access the network admin and click on Super Network. You will see a list of all posts and pages across all sites in the network that have been flagged for republication.
 
@@ -51,7 +51,7 @@ If two or more sites on a network have a post with the same numeric ID, none of 
 
 = How do I turn an existing site into the main site for a new network? =
 
-This feature is still to come.
+This feature is scheduled for the next major release.
 
 = How do I manage all of my sites in a single admin area? =
 
@@ -61,15 +61,65 @@ Go to Settings > Network and turn on consolidated mode. Effectively, this republ
 
 If two or more sites on a network have a post with the same numeric ID, none of these posts is able to be accessed on consolidated mode. You can eliminate post ID collisions by deleting posts you don't want via the network admin screen > Super Network.
 
-= Why are republished posts and pages not editable in the admin area? =
+= Is this the same as Global Terms? =
 
-This feature is still to come.
+No!
+
+WP Super Network does not enable any "global" data relationships. The data you can create with WP Super Network is the same as the data you can create without it. WP Super Network merely brings the management and the viewing of the data together into the one place.
+
+= Is this the same as WP Multi Network? =
+
+No!
+
+WP Super Network is compatible with multi-network environments, but it does not include the management tools that WP Multi Network includes. Therefore, the two plugins have different purposes and can work well together.
+
+= Is this the same as Distributor? =
+
+No!
+
+WP Super Network does not duplicate content between sites, and all posts will always continue to have one and only one permalink. Posts from across the network may preview in archives, but their permalinks will always direct back to their original respective sites.
+
+= Is this the same as MainWP? =
+
+Only a little bit.
+
+WP Super Network and MainWP share a few similar features. However, MainWP is only a good fit for users who don't use the block editor and don't use multisite, since MainWP is yet to announce any support for the block editor and MainWP's own documentation states that it does not test or support multisite. This is despite the block editor and multisite both being core WordPress features for a significant number of years.
+
+Also, MainWP's features do not integrate with the core WordPress interface and can only be accessed through its own specially-built interface.
+
+Although WP Super Network requires multisite, it does not require you to learn a new interface. Instead, you can continue working with the core WordPress interfaces you are already familiar with, including both the block editor and classic editor.
+
+= Which plugins are incompatible with WP Super Network? =
+
+WP Super Network is incompatible with [Link Manager](https://wordpress.org/plugins/link-manager/). Users of Link Manager will not be supported and are advised to not install WP Super Network.
+
+WP Super Network is currently incompatible with [SQLite Database Integration](https://wordpress.org/plugins/sqlite-database-integration/). Users of SQLite Database Integration are advised to not install WP Super Network for the time being. Compatibility is planned for a later release, so check back later.
+
+If you use a plugin that adds a db.php drop-in, it may or may not be incompatible with WP Super Network. To know if you have a db.php drop-in, go to the Plugins screen, click on Drop-in and check if db.php is listed. If the db.php drop-in was added by a plugin that follows the WordPress conventions well and has high user ratings, you are unlikely to see any incompatibility issues with WP Super Network, but you are welcome to ask on the support forum.
+
+= Is WP Super Network safe to install? =
+
+See above question about incompatible plugins.
+
+For best results, the free version of WP Super Network should be activated on a fresh network. While results will vary, you may find that some features (e.g. consolidated mode) are limited in utility for existing networks and/or cause a slow-down in performance for large networks.
+
+None the less, the utmost care has been taken to avoid permanent data loss or corruption. Keeping regular database back-ups is always recommended, but deactivating the plugin should return your network back to its previous state.
+
+A premium version is planned for the future, focusing on enhanced performance for medium-to-large networks.
 
 = How do I suggest a new feature or submit a bug report? =
 
 Through the WordPress support forum, or on the [GitHub page here.](https://github.com/carlomanf/wp-super-network/issues)
 
 == Changelog ==
+
+= 1.2.0 =
+* Republished posts and pages can be inserted, updated and deleted
+* Availability of taxonomies and comments for republished posts
+* Changed behaviour of select queries that target a specific post
+* Cache implemented for duplicate queries
+* Fixed a few bugs with network-based options
+* Minimum PHP version lifted to 7.2
 
 = 1.1.0 =
 * Behaviour implemented for republished posts and pages

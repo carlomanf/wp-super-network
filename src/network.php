@@ -299,7 +299,7 @@ class Network
 			'checkbox',
 			'Consolidated Mode',
 			'Turn on consolidated mode?',
-			'<strong>Warning:</strong> Consolidated mode is highly unstable. It is strongly suggested that you have a REGULAR backup regime in place for your database, before activating consolidated mode.'
+			'<strong>Warning:</strong> Consolidated mode is recommended for fresh networks. If you have pre-existing data (e.g. posts and pages) on your network, some of it may not be compatible with consolidated mode.'
 		);
 
 		$section->add( $field );
@@ -522,169 +522,169 @@ class Network
 
 		if ( $this->consolidated )
 		{
-			$entity = $this->get_entity_by_median_score();
+		$entity = $this->get_entity_by_median_score();
 
-			$this->consolidated = false;
+		$this->consolidated = false;
 
 			echo '<h2>ID Collisions</h2>';
 
-			if ( !empty( $this->collisions[ $entity ] ) && isset( $_POST[ 'supernetwork_' . $entity . '_collision_' . $this->collisions[ $entity ][0] ] ) )
-			{
-				$success = true;
+		if ( !empty( $this->collisions[ $entity ] ) && isset( $_POST[ 'supernetwork_' . $entity . '_collision_' . $this->collisions[ $entity ][0] ] ) )
+		{
+			$success = true;
 
-				foreach ( $this->blogs as $blog )
+			foreach ( $this->blogs as $blog )
+			{
+				if ( $blog->id !== (int) explode( '_', $_POST[ 'supernetwork_' . $entity . '_collision_' . $this->collisions[ $entity ][0] ] )[0] )
 				{
-					if ( $blog->id !== (int) explode( '_', $_POST[ 'supernetwork_' . $entity . '_collision_' . $this->collisions[ $entity ][0] ] )[0] )
+					switch_to_blog( $blog->id );
+
+					if ( $entity === 'comments' ) wp_delete_comment( (int) $this->collisions['comments'][0], true );
+					if ( $entity === 'posts' ) wp_delete_post( (int) $this->collisions['posts'][0], true );
+
+					if ( $entity === 'term_taxonomy' )
 					{
-						switch_to_blog( $blog->id );
+						$term = $GLOBALS['wpdb']->get_row( 'SELECT `taxonomy`, `term_id` FROM `' . $GLOBALS['wpdb']->term_taxonomy . '` WHERE `term_taxonomy_id` = ' . $this->collisions['term_taxonomy'][0], ARRAY_A );
 
-						if ( $entity === 'comments' ) wp_delete_comment( (int) $this->collisions['comments'][0], true );
-						if ( $entity === 'posts' ) wp_delete_post( (int) $this->collisions['posts'][0], true );
-
-						if ( $entity === 'term_taxonomy' )
+						if ( isset( $term['term_id'] ) && isset( $term['taxonomy'] ) )
 						{
-							$term = $GLOBALS['wpdb']->get_row( 'SELECT `taxonomy`, `term_id` FROM `' . $GLOBALS['wpdb']->term_taxonomy . '` WHERE `term_taxonomy_id` = ' . $this->collisions['term_taxonomy'][0], ARRAY_A );
-
-							if ( isset( $term['term_id'] ) && isset( $term['taxonomy'] ) )
-							{
-								$success = $this->force_delete_taxonomy_term( (int) $term['term_id'], $term['taxonomy'] ) && $success;
-							}
+							$success = $this->force_delete_taxonomy_term( (int) $term['term_id'], $term['taxonomy'] ) && $success;
 						}
-
-						if ( $entity === 'terms' )
-						{
-							$results = $GLOBALS['wpdb']->get_results( 'SELECT `taxonomy`, `term_id` FROM `' . $GLOBALS['wpdb']->term_taxonomy . '` WHERE `term_id` = ' . $this->collisions['terms'][0] );
-
-							foreach ( $results as $result )
-							{
-								$success = $this->force_delete_taxonomy_term( (int) $result['term_id'], $result['taxonomy'] ) && $success;
-							}
-						}
-
-						restore_current_blog();
 					}
-				}
 
-				// Start again if collision was eliminated.
-				if ( $success )
-				{
-					array_shift( $this->collisions[ $entity ] );
-					$this->consolidated = true;
-					$entity = $this->get_entity_by_median_score();
-					$this->consolidated = false;
-				}
-			}
-
-			if ( empty( $this->collisions[ $entity ] ) )
-			{
-				echo '<p>No collisions on this network!</p>';
-			}
-			else
-			{
-				// `ID` comes before `post_parent` in the `posts` sub-array, so `ID` will be correctly returned.
-				$id = array_search( $entity, WP_Super_Network::TABLES_TO_REPLACE[ $entity ], true );
-				$id = 'terms' === $entity ? 't.' . $id : $id;
-
-				$fields = array(
-					'comments' => array(
-						'post_title',
-						'comment_content',
-						'comment_author',
-						'comment_author_email'
-					),
-					'posts' => array(
-						'post_title',
-						'post_content',
-						'post_type',
-						'post_status'
-					),
-					'term_taxonomy' => array(
-						'name',
-						'description',
-						'taxonomy',
-						'count'
-					),
-					'terms' => array(
-						'name',
-						'description',
-						'taxonomy',
-						'count'
-					)
-				);
-
-				$labels = array(
-					'comments' => array(
-						'Site Containing Post/Comment',
-						'Post Containing Comment',
-						'Comment Preview',
-						'Comment Author',
-						'Comment Author Email'
-					),
-					'posts' => array(
-						'Site Containing Post',
-						'Post Title',
-						'Post Preview',
-						'Post Type',
-						'Post Status'
-					),
-					'term_taxonomy' => array(
-						'Site Containing Taxonomy Term',
-						'Taxonomy Term Name',
-						'Taxonomy Term Description',
-						'Taxonomy',
-						'Post Count'
-					),
-					'terms' => array(
-						'Site Containing Taxonomy Term',
-						'Taxonomy Term Name',
-						'Taxonomy Term Description',
-						'Taxonomy',
-						'Post Count'
-					)
-				);
-
-				echo '<p>Consolidated mode is designed for fresh networks. When activated on an existing network, a large number of ID collisions are inevitable. However, you may be able to eliminate some collisions when the ID refers to a post of low importance, such as a revision or autosave.</p>';
-				echo '<p>The below tables allow you to eliminate post, taxonomy term and comment ID collisions, one ID at a time. For each ID, you must select just ONE entity to keep. All others with the same ID will be immediately and irretrievably deleted.</p>';
-
-				if ( in_array( $entity, array( 'term_taxonomy', 'terms' ), true ) ) echo '<div class="notice notice-warning inline"><p><strong>Note:</strong> Default taxonomy terms can not be deleted! If a default taxonomy term is in a collision, you must go to Writing Settings and select a new default term for the taxonomy before you can eliminate the collision.</p></div>';
-
-				echo '<form method="post" action="">';
-				echo '<table class="widefat">';
-				echo '<thead><tr><th scope="col">Keep?</th><th scope="col">' . $labels[ $entity ][0] . '</th><th scope="col">' . $labels[ $entity ][1] . '</th><th scope="col">' . $labels[ $entity ][2] . '</th><th scope="col">' . $labels[ $entity ][3] . '</th><th scope="col">' . $labels[ $entity ][4] . '</th></tr></thead>';
-				echo '<tbody>';
-
-				foreach ( $this->blogs as $blog )
-				{
-					$tables = array(
-						'comments' => $blog->table( 'comments' ) . ' LEFT JOIN ' . $blog->table( 'posts' ) . ' ON comment_post_ID = ID',
-						'posts' => $blog->table( 'posts' ),
-						'term_taxonomy' => $blog->table( 'term_taxonomy' ) . ' tt LEFT JOIN ' . $blog->table( 'terms' ) . ' t ON tt.term_id = t.term_id',
-						'terms' => $blog->table( 'term_taxonomy' ) . ' tt LEFT JOIN ' . $blog->table( 'terms' ) . ' t ON tt.term_id = t.term_id'
-					);
-
-					$rows = $GLOBALS['wpdb']->get_results( 'SELECT `' . $fields[ $entity ][0] . '`, SUBSTRING(`' . $fields[ $entity ][1] . '`, 1, 500) AS `' . $fields[ $entity ][1] . '_preview`, `' . $fields[ $entity ][2] . '`, `' . $fields[ $entity ][3] . '` FROM ' . $tables[ $entity ] . ' WHERE `' . $id . '` = ' . $this->collisions[ $entity ][0], ARRAY_A );
-
-					// There may be more than one row if terms are not split.
-					foreach ( $rows as $key => $row )
+					if ( $entity === 'terms' )
 					{
-						echo '<tr>';
-						echo '<td><input type="radio" id="supernetwork__' . esc_attr( $blog->id ) . '_' . $key . '" value="' . esc_attr( $blog->id ) . '" name="supernetwork_' . $entity . '_collision_' . $this->collisions[ $entity ][0] . '"></td>';
-						echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '_' . $key . '">' . esc_html( $blog->name ) . '</label></td>';
-						echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '_' . $key . '">' . esc_html( $row[ $fields[ $entity ][0] ] ) . '</label></td>';
-						echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '_' . $key . '">' . esc_html( $row[ $fields[ $entity ][1] . '_preview' ] ) . '</label></td>';
-						echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '_' . $key . '">' . esc_html( $row[ $fields[ $entity ][2] ] ) . '</label></td>';
-						echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '_' . $key . '">' . esc_html( $row[ $fields[ $entity ][3] ] ) . '</label></td>';
-						echo '</tr>';
-					}
-				}
+						$results = $GLOBALS['wpdb']->get_results( 'SELECT `taxonomy`, `term_id` FROM `' . $GLOBALS['wpdb']->term_taxonomy . '` WHERE `term_id` = ' . $this->collisions['terms'][0] );
 
-				echo '</tbody></table>';
-				submit_button( 'Keep Selected and Delete All Others' );
-				echo '</form>';
+						foreach ( $results as $result )
+						{
+							$success = $this->force_delete_taxonomy_term( (int) $result['term_id'], $result['taxonomy'] ) && $success;
+						}
+					}
+
+					restore_current_blog();
+				}
 			}
 
-			$this->consolidated = true;
+			// Start again if collision was eliminated.
+			if ( $success )
+			{
+				array_shift( $this->collisions[ $entity ] );
+				$this->consolidated = true;
+				$entity = $this->get_entity_by_median_score();
+				$this->consolidated = false;
+			}
 		}
+
+		if ( empty( $this->collisions[ $entity ] ) )
+		{
+			echo '<p>No collisions on this network!</p>';
+		}
+		else
+		{
+			// `ID` comes before `post_parent` in the `posts` sub-array, so `ID` will be correctly returned.
+			$id = array_search( $entity, WP_Super_Network::TABLES_TO_REPLACE[ $entity ], true );
+			$id = 'terms' === $entity ? 't.' . $id : $id;
+
+			$fields = array(
+				'comments' => array(
+					'post_title',
+					'comment_content',
+					'comment_author',
+					'comment_author_email'
+				),
+				'posts' => array(
+					'post_title',
+					'post_content',
+					'post_type',
+					'post_status'
+				),
+				'term_taxonomy' => array(
+					'name',
+					'description',
+					'taxonomy',
+					'count'
+				),
+				'terms' => array(
+					'name',
+					'description',
+					'taxonomy',
+					'count'
+				)
+			);
+
+			$labels = array(
+				'comments' => array(
+					'Site Containing Post/Comment',
+					'Post Containing Comment',
+					'Comment Preview',
+					'Comment Author',
+					'Comment Author Email'
+				),
+				'posts' => array(
+					'Site Containing Post',
+					'Post Title',
+					'Post Preview',
+					'Post Type',
+					'Post Status'
+				),
+				'term_taxonomy' => array(
+					'Site Containing Taxonomy Term',
+					'Taxonomy Term Name',
+					'Taxonomy Term Description',
+					'Taxonomy',
+					'Post Count'
+				),
+				'terms' => array(
+					'Site Containing Taxonomy Term',
+					'Taxonomy Term Name',
+					'Taxonomy Term Description',
+					'Taxonomy',
+					'Post Count'
+				)
+			);
+
+			echo '<p>Consolidated mode is designed for fresh networks. When activated on an existing network, a large number of ID collisions are inevitable. However, you may be able to eliminate some collisions when the ID refers to a post of low importance, such as a revision or autosave.</p>';
+			echo '<p>The below tables allow you to eliminate post, taxonomy term and comment ID collisions, one ID at a time. For each ID, you must select just ONE entity to keep. All others with the same ID will be immediately and irretrievably deleted.</p>';
+
+			if ( in_array( $entity, array( 'term_taxonomy', 'terms' ), true ) ) echo '<div class="notice notice-warning inline"><p><strong>Note:</strong> Default taxonomy terms can not be deleted! If a default taxonomy term is in a collision, you must go to Writing Settings and select a new default term for the taxonomy before you can eliminate the collision.</p></div>';
+
+			echo '<form method="post" action="">';
+			echo '<table class="widefat">';
+			echo '<thead><tr><th scope="col">Keep?</th><th scope="col">' . $labels[ $entity ][0] . '</th><th scope="col">' . $labels[ $entity ][1] . '</th><th scope="col">' . $labels[ $entity ][2] . '</th><th scope="col">' . $labels[ $entity ][3] . '</th><th scope="col">' . $labels[ $entity ][4] . '</th></tr></thead>';
+			echo '<tbody>';
+
+			foreach ( $this->blogs as $blog )
+			{
+				$tables = array(
+					'comments' => $blog->table( 'comments' ) . ' LEFT JOIN ' . $blog->table( 'posts' ) . ' ON comment_post_ID = ID',
+					'posts' => $blog->table( 'posts' ),
+					'term_taxonomy' => $blog->table( 'term_taxonomy' ) . ' tt LEFT JOIN ' . $blog->table( 'terms' ) . ' t ON tt.term_id = t.term_id',
+					'terms' => $blog->table( 'term_taxonomy' ) . ' tt LEFT JOIN ' . $blog->table( 'terms' ) . ' t ON tt.term_id = t.term_id'
+				);
+
+				$rows = $GLOBALS['wpdb']->get_results( 'SELECT `' . $fields[ $entity ][0] . '`, SUBSTRING(`' . $fields[ $entity ][1] . '`, 1, 500) AS `' . $fields[ $entity ][1] . '_preview`, `' . $fields[ $entity ][2] . '`, `' . $fields[ $entity ][3] . '` FROM ' . $tables[ $entity ] . ' WHERE `' . $id . '` = ' . $this->collisions[ $entity ][0], ARRAY_A );
+
+				// There may be more than one row if terms are not split.
+				foreach ( $rows as $key => $row )
+				{
+					echo '<tr>';
+					echo '<td><input type="radio" id="supernetwork__' . esc_attr( $blog->id ) . '_' . $key . '" value="' . esc_attr( $blog->id ) . '" name="supernetwork_' . $entity . '_collision_' . $this->collisions[ $entity ][0] . '"></td>';
+					echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '_' . $key . '">' . esc_html( $blog->name ) . '</label></td>';
+					echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '_' . $key . '">' . esc_html( $row[ $fields[ $entity ][0] ] ) . '</label></td>';
+					echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '_' . $key . '">' . esc_html( $row[ $fields[ $entity ][1] . '_preview' ] ) . '</label></td>';
+					echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '_' . $key . '">' . esc_html( $row[ $fields[ $entity ][2] ] ) . '</label></td>';
+					echo '<td><label for="supernetwork__' . esc_attr( $blog->id ) . '_' . $key . '">' . esc_html( $row[ $fields[ $entity ][3] ] ) . '</label></td>';
+					echo '</tr>';
+				}
+			}
+
+			echo '</tbody></table>';
+			submit_button( 'Keep Selected and Delete All Others' );
+			echo '</form>';
+		}
+
+		$this->consolidated = true;
+	}
 		else
 		{
 			echo '<h2>Republished Posts and Pages</h2>';

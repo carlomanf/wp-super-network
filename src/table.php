@@ -99,10 +99,10 @@ class SQL_Table extends SQL_Node
 				$where = array();
 
 				// Exclude collisions and network-based post types.
-				if ( !$use_union )
+				if ( !$use_union && isset( $node['table'] ) )
 				{
 					$blog = isset( $blog_to_replace ) ? $blog_to_replace : $query->network->get_blog_by_id( get_current_blog_id() );
-					$alias = isset( $node['alias'] ) && !empty( $node['alias']['name'] ) ? $node['alias']['name'] : $local_table;
+					$alias = isset( $node['alias'] ) && !empty( $node['alias']['name'] ) ? $node['alias']['name'] : $node['table'];
 					$query->network->exclude( $where, $table_schema, $blog, $alias );
 					empty( $where ) or $query->condition( implode( ' AND ', $where ) );
 				}

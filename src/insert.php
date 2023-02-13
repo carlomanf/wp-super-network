@@ -41,7 +41,7 @@ class SQL_Table_For_Insert extends SQL_Node
 		}
 		else
 		{
-			return !isset( $this->replaced_blog ) && !isset( $suggestion ) || $suggestion->id === $this->replaced_blog->id;
+			return !isset( $this->replaced_blog ) && !isset( $suggestion ) || isset( $this->replaced_blog ) && isset( $suggestion ) && $suggestion->id === $this->replaced_blog->id;
 		}
 	}
 

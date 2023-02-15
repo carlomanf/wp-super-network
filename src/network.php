@@ -241,9 +241,12 @@ class Network
 	 */
 	public function __construct( $network )
 	{
+		$blogs_labels = array();
+
 		foreach ( get_sites( 'network_id=' . $network->id ) as $site )
 		{
 			$this->blogs[ (int) $site->blog_id ] = new Blog( $site );
+			$this->blogs[ (int) $site->blog_id ]->is_network() or $blogs_labels[ $site->blog_id ] = $site->blogname;
 		}
 
 		$this->tools = new Tools_Page(
@@ -268,9 +271,21 @@ class Network
 		$activate = new Input_Section(
 			'activate',
 			'Activate Subnetworks',
-			'Use this tool to activate subnetworks with this network\'s sites as their main sites.',
-			array( $this, 'get_blogs_for_user' )
+			empty( $blogs_labels ) ? 'This network has no sites to activate!' : 'Use this tool to activate subnetworks with this network\'s sites as their main sites. Note that only unactivated sites are listed.'
 		);
+
+		if ( !empty( $blogs_labels ) )
+		{
+			$activate_field = new Input_Field(
+				'',
+				'%s',
+				'checkbox',
+				'Activate Subnetwork',
+				$blogs_labels
+			);
+
+			$activate->add( $activate_field );
+		}
 
 		$this->tools->add( $main );
 		$this->tools->add( $activate );
@@ -752,25 +767,6 @@ class Network
 		$this->consolidated = $old;
 
 		return $query->posts;
-	}
-
-	/**
-	 * List all blogs for current user (network admin)
-	 *
-	 * @since 1.0.4
-	 */
-	public function get_blogs_for_user()
-	{
-		if ( empty( $this->blogs ) )
-		{
-			echo 'This network has no blogs!';
-			return;
-		}
-
-		foreach ( $this->blogs as $blog )
-		{
-			echo $blog->wp_site->__get( 'blogname' ) . ' <a href="' . admin_url( 'network/admin.php?page=wp_super_network&upgrade=' . $blog->wp_site->__get( 'id' ) ) . '">(Upgrade?)</a><br>';
-		}
 	}
 
 	public function intercept_query( $query )

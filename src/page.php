@@ -1,12 +1,11 @@
 <?php
 /**
- * Settings page class.
+ * Admin page class.
  */
 namespace WP_Super_Network;
 
-class Settings_Page
+abstract class Page
 {
-	private $database;
 	private $title;
 	private $menu;
 	private $capability;
@@ -14,11 +13,11 @@ class Settings_Page
 	private $description;
 	private $priority;
 	private $submenu;
+	private $icon;
 	private $sections;
 
-	public function __construct( $database, $title, $menu, $capability, $slug, $description, $priority = 10, $submenu = false )
+	public function __construct( $title, $menu, $capability, $slug, $description, $priority, $submenu, $icon )
 	{
-		$this->database = is_string( $database ) ? array( $database ) : $database;
 		$this->title = $title;
 		$this->menu = $menu;
 		$this->capability = $capability;
@@ -26,74 +25,41 @@ class Settings_Page
 		$this->description = $description;
 		$this->priority = $priority;
 		$this->submenu = $submenu;
+		$this->icon = $icon;
 
 		$this->sections = array();
-	}
-
-	public function database()
-	{
-		return $this->database;
 	}
 
 	public function callback()
 	{
 		echo '<div class="wrap">';
-		printf( '<h2>%s</h2>', $this->title );
-		echo '<form method="post" action="options.php">';
+		printf( '<h1 class="wp-heading-inline">%s</h1>', $this->title );
 		echo $this->description;
-		submit_button();
-		do_action( 'supernetwork_page_content_' . $this->slug );
-		settings_fields( $this->slug );
-		do_settings_sections( $this->slug );
-		submit_button();
-		echo '</form></div>';
+		$this->callback_inner();
+		echo '</div>';
 	}
+
+	protected abstract function callback_inner();
 
 	public function add( $section )
 	{
 		$this->sections[] = $section;
 	}
 
-	public function register()
+	public function register( $network )
 	{
-		add_action( 'admin_init', array( $this, 'init' ) );
-		add_filter( 'admin_menu', array( $this, 'menu' ), $this->priority );
+		$hook = $network ? 'network_admin_menu' : 'admin_menu';
+        add_action( $hook, array( $this, 'menu' ), $this->priority );
 	}
 
-	public function init()
+	public function slug()
 	{
-		foreach ( $this->sections as $section )
-		{
-			add_settings_section(
-				$this->slug . '_' . $section->id(), // ID
-				$section->title(), // title to be displayed
-				array( $section, 'callback' ), // callback
-				$this->slug // settings page to add to
-			);
+		return $this->slug;
+	}
 
-			foreach ( $section->fields() as $field )
-			{
-				if ( $field->type() == 'checkbox' || is_array( $field->label() ) )
-				{
-					$label = $field->title();
-				}
-				else
-				{
-					$label = '<label for="' . $field->database() . '[' . $field->id() . ']">' . $field->title() . '</label>';
-				}
-		
-				add_settings_field(
-					$field->id(), // ID
-					$label, // label
-					array( $field, 'callback' ), // callback
-					$this->slug, // settings page to add to
-					$this->slug . '_' . $section->id() // section to add to
-				);
-			}
-		}
-	
-		foreach ( $this->database as $database )
-		register_setting( $this->slug, $database );
+	public function sections()
+	{
+		return $this->sections;
 	}
 
 	public function menu()
@@ -101,6 +67,6 @@ class Settings_Page
 		if ( $this->submenu )
 			add_submenu_page( $this->submenu, $this->title, $this->menu, $this->capability, $this->slug, array( $this, 'callback' ) );
 		else
-			add_menu_page( $this->title, $this->menu, $this->capability, $this->slug, array( $this, 'callback' ) );
+			add_menu_page( $this->title, $this->menu, $this->capability, $this->slug, array( $this, 'callback' ), $this->icon );
 	}
 }

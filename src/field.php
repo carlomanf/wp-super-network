@@ -1,10 +1,10 @@
 <?php
 /**
- * Settings field class.
+ * Input field class.
  */
 namespace WP_Super_Network;
 
-class Settings_Field
+class Input_Field
 {
 	private $database;
 	private $id;

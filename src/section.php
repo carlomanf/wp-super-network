@@ -1,21 +1,23 @@
 <?php
 /**
- * Settings section class.
+ * Input section class.
  */
 namespace WP_Super_Network;
 
-class Settings_Section
+class Input_Section
 {
 	private $id;
 	private $title;
 	private $description;
+	private $callback;
 	private $fields;
 
-	public function __construct( $id, $title, $description = '' )
+	public function __construct( $id, $title, $description = '', $callback = '' )
 	{
 		$this->id = $id;
 		$this->title = $title;
 		$this->description = $description;
+		$this->callback = $callback;
 
 		$this->fields = array();
 	}
@@ -44,6 +46,8 @@ class Settings_Section
 	{
 		if ( !empty( $this->description ) )
 			echo '<p>' . $this->description . '</p>';
+
+		empty( $this->callback ) or call_user_func( $this->callback );
 	}
 
 	public function add( $field )

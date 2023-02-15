@@ -44,7 +44,15 @@ class Network
 	 * @since 1.0.7
 	 * @var Settings_Page
 	 */
-	private $page;
+	private $settings;
+
+	/**
+	 * Tools page.
+	 *
+	 * @since 1.3.0
+	 * @var Tools_Page
+	 */
+	private $tools;
 
 	/**
 	 * Keeps track of ID collisions.
@@ -238,7 +246,36 @@ class Network
 			$this->blogs[ (int) $site->blog_id ] = new Blog( $site );
 		}
 
-		$this->page = new Settings_Page(
+		$this->tools = new Tools_Page(
+			true,
+			'Network Tools',
+			'Network Tools',
+			'manage_network_options',
+			'wp_super_network',
+			'',
+			10,
+			false,
+			'dashicons-networking'
+		);
+
+		$main = new Input_Section(
+			'main',
+			$this->consolidated ? 'ID Collisions' : 'Republished Posts and Pages',
+			'',
+			array( $this, $this->consolidated ? 'page' : 'republished' )
+		);
+
+		$activate = new Input_Section(
+			'activate',
+			'Activate Subnetworks',
+			'Use this tool to activate subnetworks with this network\'s sites as their main sites.',
+			array( $this, 'get_blogs_for_user' )
+		);
+
+		$this->tools->add( $main );
+		$this->tools->add( $activate );
+
+		$this->settings = new Settings_Page(
 			array( 'supernetwork_options', 'supernetwork_post_types', 'supernetwork_consolidated' ),
 			'Network Settings',
 			'Network',
@@ -249,7 +286,7 @@ class Network
 			'options-general.php'
 		);
 
-		$section = new Settings_Section(
+		$section = new Input_Section(
 			'options',
 			'Options',
 			'This setting only takes effect when consolidated mode is turned on.'
@@ -264,7 +301,7 @@ class Network
 			$labels[ $result->option_name ] = $result->option_name;
 		}
 
-		$field = new Settings_Field(
+		$field = new Input_Field(
 			'supernetwork_options',
 			'%s',
 			'checkbox',
@@ -272,7 +309,7 @@ class Network
 			$labels
 		);
 
-		$section2 = new Settings_Section(
+		$section2 = new Input_Section(
 			'post_types',
 			'Post Types',
 			'This setting only takes effect when consolidated mode is turned on.'
@@ -280,7 +317,7 @@ class Network
 
 		add_filter( 'supernetwork_settings_field_args', array( $this, 'post_types' ), 10, 2 );
 
-		$field2 = new Settings_Field(
+		$field2 = new Input_Field(
 			'supernetwork_post_types',
 			'%s',
 			'checkbox',
@@ -288,12 +325,12 @@ class Network
 			array()
 		);
 
-		$section3 = new Settings_Section(
+		$section3 = new Input_Section(
 			'consolidated',
 			'Consolidated Mode'
 		);
 
-		$field3 = new Settings_Field(
+		$field3 = new Input_Field(
 			'supernetwork_consolidated',
 			'consolidated',
 			'checkbox',
@@ -305,9 +342,9 @@ class Network
 		$section->add( $field );
 		$section2->add( $field2 );
 		$section3->add( $field3 );
-		$this->page->add( $section3 );
-		$this->page->add( $section2 );
-		$this->page->add( $section );
+		$this->settings->add( $section3 );
+		$this->settings->add( $section2 );
+		$this->settings->add( $section );
 	}
 
 	public function add_new_post( $hook_suffix )
@@ -388,7 +425,8 @@ class Network
 
 	public function register()
 	{
-		$this->page->register();
+		$this->settings->register();
+		$this->tools->register();
 
 		add_filter( 'post_type_link', array( $this, 'intercept_permalink_for_post' ), 10, 2 );
 		add_filter( 'post_link', array( $this, 'intercept_permalink_for_post' ), 10, 2 );
@@ -517,16 +555,9 @@ class Network
 
 	public function page()
 	{
-		echo '<div class="wrap">';
-		echo '<h1 class="wp-heading-inline">WP Super Network</h1>';
-
-		if ( $this->consolidated )
-		{
 		$entity = $this->get_entity_by_median_score();
 
 		$this->consolidated = false;
-
-			echo '<h2>ID Collisions</h2>';
 
 		if ( !empty( $this->collisions[ $entity ] ) && isset( $_POST[ 'supernetwork_' . $entity . '_collision_' . $this->collisions[ $entity ][0] ] ) )
 		{
@@ -684,16 +715,6 @@ class Network
 		}
 
 		$this->consolidated = true;
-	}
-		else
-		{
-			echo '<h2>Republished Posts and Pages</h2>';
-			$this->republished();
-		}
-		
-		echo '<h2>Upgrade to Network</h2>';
-		$this->get_blogs_for_user();
-		echo '</div>';
 	}
 
 	/**

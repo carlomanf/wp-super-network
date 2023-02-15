@@ -174,26 +174,12 @@ class WP_Super_Network
 
 		$this->network->register();
 
-		// Load functions
-		add_filter( 'network_admin_menu', array( $this, 'summary' ) );
-
 		if ( !$this->network->consolidated )
 		{
 			add_filter( 'admin_init', array( $this, 'update_db' ) );
 			add_filter( 'page_row_actions', array( $this, 'republish' ), 10, 2 );
 			add_filter( 'post_row_actions', array( $this, 'republish' ), 10, 2 );
 		}
-	}
-
-	public function summary()
-	{
-		add_menu_page(
-			'WP Super Network',
-			'Super Network',
-			'manage_network_options',
-			'wp_super_network',
-			array( $this->network, 'page' )
-		);
 	}
 
 	/**

@@ -36,8 +36,10 @@ require_once SUPER_NETWORK_DIR . 'src/page.php';
 require_once SUPER_NETWORK_DIR . 'src/plugin.php';
 require_once SUPER_NETWORK_DIR . 'src/query.php';
 require_once SUPER_NETWORK_DIR . 'src/section.php';
+require_once SUPER_NETWORK_DIR . 'src/settings.php';
 require_once SUPER_NETWORK_DIR . 'src/subquery.php';
 require_once SUPER_NETWORK_DIR . 'src/table.php';
+require_once SUPER_NETWORK_DIR . 'src/tools.php';
 
 // Initialize the plugin.
 $GLOBALS['supernetwork'] = new WP_Super_Network();

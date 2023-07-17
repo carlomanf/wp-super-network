@@ -15,6 +15,16 @@ class Blog
 	public $wp_site;
 
 	/**
+	 * ID of the subnetwork based on this site.
+	 * 0 if none.
+	 * Lazily set by `is_network` method.
+	 *
+	 * @since 1.3.0
+	 * @var int|null
+	 */
+	private $subnetwork_id = null;
+
+	/**
 	 * Constructor.
 	 *
 	 * Constructs the site.
@@ -55,7 +65,21 @@ class Blog
 
 	public function is_network()
 	{
-		return is_main_site( $this->__get( 'id' ), $this->__get( 'network_id' ) );
+		while ( !isset( $this->subnetwork_id ) )
+		{
+			$this->subnetwork_id = 0;
+
+			foreach ( get_networks( 'fields=ids' ) as $network_id )
+			{
+				if ( is_main_site( $this->id, $network_id ) )
+				{
+					$this->subnetwork_id = $network_id;
+					break;
+				}
+			}
+		}
+
+		return $this->subnetwork_id > 0;
 	}
 
 	/**
@@ -65,7 +89,14 @@ class Blog
 	 */
 	public function upgrade_to_network()
 	{
-		if ( function_exists( 'get_network' ) )
-			update_option( '_supernetwork_parent_site', (string) get_network()->get_main_site_id() );
+		if ( !$this->is_network() )
+		{
+			$this->subnetwork_id = (int) $GLOBALS['wpdb']->get_var( 'SELECT `auto_increment` FROM `information_schema`.`tables` WHERE `table_schema` = \'' . DB_NAME . '\' AND `table_name` = \'' . $GLOBALS['wpdb']->base_prefix . 'site\'' );
+			require_once ABSPATH . '/wp-admin/includes/schema.php';
+			switch_to_blog( $this->id );
+			populate_network( $this->subnetwork_id, $this->wp_site->domain, get_option( 'admin_email' ), $this->name, $this->wp_site->path, is_subdomain_install() );
+			update_network_option( $this->subnetwork_id, 'main_site', $this->id );
+			restore_current_blog();
+		}
 	}
 }

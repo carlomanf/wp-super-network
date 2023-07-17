@@ -271,13 +271,14 @@ class Network
 		$activate = new Input_Section(
 			'activate',
 			'Activate Subnetworks',
-			empty( $blogs_labels ) ? 'This network has no sites to activate!' : 'Use this tool to activate subnetworks with this network\'s sites as their main sites. Note that only unactivated sites are listed.'
+			empty( $blogs_labels ) ? 'This network has no sites to activate!' : 'Use this tool to activate subnetworks with this network\'s sites as their main sites. Note that only unactivated sites are listed.',
+			array( $this, 'activate' )
 		);
 
 		if ( !empty( $blogs_labels ) )
 		{
 			$activate_field = new Input_Field(
-				'',
+				'activate',
 				'%s',
 				'checkbox',
 				'Activate Subnetwork',
@@ -749,6 +750,17 @@ class Network
 
 		foreach ( $republished as $post )
 			echo '<a href="' . get_permalink( $post ) . '">' . $post->post_title . '</a><br>';
+	}
+
+	public function activate()
+	{
+		if ( isset( $_POST['activate'] ) )
+		{
+			foreach ( $this->blogs as $blog )
+			{
+				empty( $_POST['activate'][ (string) $blog->id ] ) or $blog->upgrade_to_network();
+			}
+		}
 	}
 
 	/**

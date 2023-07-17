@@ -21,7 +21,7 @@ class Tools_Page extends Page
 
 	protected function callback_inner()
 	{
-        foreach ( $this->sections() as $section )
+		foreach ( $this->sections() as $section )
 		{
 			echo '<h2>' . $section->title() . '</h2>';
 			$section->callback();
@@ -30,6 +30,7 @@ class Tools_Page extends Page
 
 			if ( !empty( $fields ) )
 			{
+				echo '<form method="post" action="">';
 				echo '<table class="form-table" role="presentation"><tbody>';
 
 				foreach ( $fields as $field )
@@ -51,6 +52,8 @@ class Tools_Page extends Page
 				}
 
 				echo '</tbody></table>';
+				submit_button();
+				echo '</form>';
 			}
 		}
 	}

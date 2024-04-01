@@ -74,6 +74,22 @@ class Query
 	private $expressions = array();
 
 	/**
+	 * Tables being joined.
+	 *
+	 * @since 1.3.0
+	 * @var WP_Super_Network\Table[]
+	 */
+	private $joins = array();
+
+	/**
+	 * Suggestion for table replacement.
+	 *
+	 * @since 1.3.0
+	 * @var WP_Super_Network\Suggestion
+	 */
+	private $suggestion;
+
+	/**
 	 * SQL parser getter.
 	 *
 	 * @since 1.2.0
@@ -170,6 +186,7 @@ class Query
 			case 'column_list': return $this->column_list;
 			case 'replacements': return isset( $this->expressions['WHERE'] ) ? $this->expressions['WHERE']->replacements : WP_Super_Network::ENTITIES_TO_REPLACE;
 			case 'meta_ids': return isset( $this->expressions['WHERE'] ) ? $this->expressions['WHERE']->meta_ids : array();
+			case 'suggestion': return isset( $this->suggestion ) ? $this->suggestion : $this->suggestion = new Suggestion();
 		}
 	}
 
@@ -322,6 +339,32 @@ class Query
 					$this->parsed['WHERE'] = $parsed['WHERE'];
 				}
 			}
+		}
+	}
+
+	/**
+	 * Joins a table onto this query.
+	 *
+	 * @since 1.3.0
+	 *
+	 * @param WP_Super_Network\Table $table Table to add to the query.
+	 * @param string $table_schema Schema for the table.
+	 */
+	public function join( $table, $table_schema )
+	{
+		$this->joins[ $table_schema ] = $table;
+	}
+
+	/**
+	 * Transforms all joined tables for the suggested blog.
+	 *
+	 * @since 1.3.0
+	 */
+	public function transform_joins()
+	{
+		foreach ( $this->joins as $table_schema => $table )
+		{
+			$table->transform_for_blog( $this->suggestion->get(), $table_schema, $this );
 		}
 	}
 }

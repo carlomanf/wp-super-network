@@ -14,7 +14,7 @@ class SQL_Table extends SQL_Node
 	 *
 	 * @param array $node SQL parse tree for this table.
 	 * @param WP_Super_Network\Query $query Query context for this table.
-	 * @param bool $read_only Whether the query context is read only. If so, the table must not be replaced by a union.
+	 * @param bool $read_only Whether the query context is read only. Default true.
 	 */
 	public function __construct( $node, $query, $read_only = true )
 	{
@@ -29,92 +29,124 @@ class SQL_Table extends SQL_Node
 
 			if ( $table === $local_table )
 			{
-				$use_union = !$read_only || ( $union = $query->network->union( $table_schema ) ) !== $table;
-				$blog_to_replace = null;
+				$query->join( $this, $table_schema );
 
 				$replacements = $query->replacements;
 				$meta_ids = $query->meta_ids;
+				$suggestion = $query->suggestion;
 
 				// Replace queries targeting a single entity.
 				foreach ( $tables as $column => $entity )
 				{
 					if ( $query->id_set( $replacements[ $entity ] ) && $query->column_set( $replacements[ $entity ] ) && $replacements[ $entity ]['column'] === $column )
 					{
-						$blog_to_replace = $query->network->get_blog( $replacements[ $entity ]['id'], $entity );
-						$use_union = false;
-						break;
+						$suggestion->suggest_blog( $query->network->get_blog( $replacements[ $entity ]['id'], $entity ) );
 					}
 				}
 
-				// Replace update/delete for meta tables.
-				if ( !isset( $blog_to_replace ) && !$read_only && in_array( $table_schema, array( 'commentmeta', 'postmeta', 'termmeta' ), true ) && !empty( $meta_ids ) && $meta_ids === $query->network->meta_ids() )
-				{
-					$blog_to_replace = $query->network->get_blog( $query->network->meta_object_id(), str_replace( 'meta', 's', $table_schema ) );
-					$query->network->pop_meta_ids();
-				}
+				$use_union = $read_only && $suggestion->fresh() && ( $union = $query->network->union( $table_schema ) ) !== $table;
 
-				// Replace the table with another blog.
-				if ( isset( $blog_to_replace ) )
+				// if relationships table, add the join of either posts or taxonomy table if not joined already
+				if ( $use_union )
 				{
-					$node['table'] = $blog_to_replace->table( $table_schema );
+					// Replace the table with a union.
+					$node['expr_type'] = 'subquery';
+					$node['base_expr'] = $union;
+					$node['sub_tree'] = $query->parser()->parse( $union );
 
-					$node['no_quotes'] = array(
-						'delim' => false,
-						'parts' => array( $node['table'] )
-					);
+					unset( $node['table'] );
+					unset( $node['no_quotes'] );
+
+					$this->alias( $node, $local_table );
+
+					$this->transformed = $node;
+					$this->modified = true;
 				}
 				else
 				{
-					// Replace the table with a union.
-					if ( $read_only && $use_union )
+					// Replace update/delete for meta tables.
+					if ( !$read_only && in_array( $table_schema, array( 'commentmeta', 'postmeta', 'termmeta' ), true ) && !empty( $meta_ids ) && $meta_ids === $query->network->meta_ids() )
 					{
-						$node['expr_type'] = 'subquery';
-						$node['base_expr'] = $union;
-						$node['sub_tree'] = $query->parser()->parse( $union );
-
-						unset( $node['table'] );
-						unset( $node['no_quotes'] );
+						$suggestion->suggest_blog( $query->network->get_blog( $query->network->meta_object_id(), str_replace( 'meta', 's', $table_schema ) ) );
+						$query->network->pop_meta_ids();
 					}
-				}
 
-				// For read only queries, add an alias if there is not already one.
-				if ( $read_only && ( $use_union || isset( $blog_to_replace ) ) && isset( $node['alias'] ) && false === $node['alias'] )
-				{
-					$node['alias'] = array(
-						'as' => false,
-						'name' => $local_table,
-						'no_quotes' => array(
-							'delim' => false,
-							'parts' => array( $local_table )
-						),
-						'base_expr' => $local_table
-					);
-				}
-
-				if ( isset( $blog_to_replace ) && isset( $node['table'] ) && isset( $node['alias'] ) && isset( $node['alias']['base_expr'] ) )
-				{
-					$node['base_expr'] = $node['table'] . ' ' . $node['alias']['base_expr'];
-				}
-
-				$where = array();
-
-				// Exclude collisions and network-based post types.
-				if ( !$use_union && isset( $node['table'] ) )
-				{
-					$blog = isset( $blog_to_replace ) ? $blog_to_replace : $query->network->get_blog_by_id( get_current_blog_id() );
-					$alias = isset( $node['alias'] ) && !empty( $node['alias']['name'] ) ? $node['alias']['name'] : $node['table'];
-					$query->network->exclude( $where, $table_schema, $blog, $alias );
-					empty( $where ) or $query->condition( implode( ' AND ', $where ) );
-				}
-
-				if ( $read_only && $use_union || isset( $blog_to_replace ) || !empty( $where ) )
-				{
-					$this->transformed = $node;
-					$this->modified = true;
+					// Replace the table with another blog.
+					$query->transform_joins();
 				}
 
 				return;
 			}
 		}
+	}
+
+	/**
+	 * Adds an alias to the table node.
+	 *
+	 * @since 1.3.0
+	 *
+	 * @param array $node SQL parse tree for this table, passed by reference.
+	 * @param string $alias Alias for the table.
+	 */
+	private function alias( &$node, $alias )
+	{
+		// For read only queries, add an alias if there is not already one.
+		if ( isset( $node['alias'] ) && false === $node['alias'] )
+		{
+			$node['alias'] = array(
+				'as' => false,
+				'name' => $alias,
+				'no_quotes' => array(
+					'delim' => false,
+					'parts' => array( $alias )
+				),
+				'base_expr' => $alias
+			);
+		}
+	}
+
+	/**
+	 * Replaces the table with another table if a suggestion was made after instantiation time.
+	 *
+	 * @since 1.3.0
+	 *
+	 * @param WP_Super_Network\Blog|null $blog_to_replace Blog to replace table with, or null if no replacement.
+	 * @param string $table_schema Schema for this table.
+	 * @param WP_Super_Network\Query $query Query context for this table.
+	 */
+	public function transform_for_blog( $blog_to_replace, $table_schema, $query )
+	{
+		$node = $this->original;
+
+		if ( isset( $blog_to_replace ) )
+		{
+			$node['table'] = $blog_to_replace->table( $table_schema );
+
+			$node['no_quotes'] = array(
+				'delim' => false,
+				'parts' => array( $node['table'] )
+			);
+
+			$this->alias( $node, $GLOBALS['wpdb']->__get( $table_schema ) );
+
+			if ( isset( $node['table'] ) && isset( $node['alias'] ) && isset( $node['alias']['base_expr'] ) )
+			{
+				$node['base_expr'] = $node['table'] . ' ' . $node['alias']['base_expr'];
+			}
+		}
+
+		$where = array();
+
+		// Exclude collisions and network-based post types.
+		if ( isset( $node['table'] ) )
+		{
+			$blog = isset( $blog_to_replace ) ? $blog_to_replace : $query->network->get_blog_by_id( get_current_blog_id() );
+			$alias = isset( $node['alias'] ) && !empty( $node['alias']['name'] ) ? $node['alias']['name'] : $node['table'];
+			$query->network->exclude( $where, $table_schema, $blog, $alias );
+			empty( $where ) or $query->condition( implode( ' AND ', $where ) );
+		}
+
+		$this->transformed = $node;
+		$this->modified = isset( $blog_to_replace ) || !empty( $where );
 	}
 }

@@ -70,6 +70,18 @@ class Suggestion
 	 */
 	public function get()
 	{
-		return $this->$never_failed ? $this->first_suggestion : null;
+		return $this->never_failed ? $this->first_suggestion : null;
+	}
+
+	/**
+	 * Whether the `suggest_blog` method has never been called.
+	 *
+	 * @since 1.3.0
+	 *
+	 * @return bool Whether the suggestion is fresh.
+	 */
+	public function fresh()
+	{
+		return $this->never_suggested;
 	}
 }

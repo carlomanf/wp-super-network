@@ -38,6 +38,7 @@ require_once SUPER_NETWORK_DIR . 'src/query.php';
 require_once SUPER_NETWORK_DIR . 'src/section.php';
 require_once SUPER_NETWORK_DIR . 'src/settings.php';
 require_once SUPER_NETWORK_DIR . 'src/subquery.php';
+require_once SUPER_NETWORK_DIR . 'src/suggestion.php';
 require_once SUPER_NETWORK_DIR . 'src/table.php';
 require_once SUPER_NETWORK_DIR . 'src/tools.php';
 

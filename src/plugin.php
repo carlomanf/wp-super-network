@@ -91,24 +91,24 @@ class WP_Super_Network
 			if ( $main > 0 )
 			{
 				switch_to_blog( $main );
-				$value = get_option( $option, $default );
+				$new_value = get_option( $option, $default );
 				restore_current_blog();
 			}
 			else
 			{
 				if ( in_array( $option, array( 'supernetwork_consolidated', 'supernetwork_post_types', 'supernetwork_options' ), true ) )
 				{
-					$value = $default;
+					$new_value = $default;
 				}
 			}
 
-			if ( $value === false )
+			if ( isset( $new_value ) && $new_value === false )
 			{
 				add_filter( 'option_' . $option, '__return_false' );
 			}
 		}
 
-		return $value;
+		return isset( $new_value ) ? $new_value : $value;
 	}
 
 	public static function add_option( $option, $value )

@@ -152,11 +152,33 @@ class Network
 		}
 
 		$tables = array();
+		$alias = '';
+		$cols = '*';
+
+		if ( $table === 'term_relationships' )
+		{
+			$alias = 'tr';
+			$cols = $alias . '.' . $cols;
+		}
 
 		foreach ( $this->blogs as $blog )
 		{
+			$from = '`' . $blog->table( $table ) . '`';
 			$where = array();
-			$this->exclude( $where, $table, $blog );
+
+			$this->exclude( $where, $table, $blog, $alias );
+
+			if ( $table === 'term_relationships' )
+			{
+				$from .= ' ' . $alias;
+
+				foreach ( array( 'posts' => 'p', 'term_taxonomy' => 'tt' ) as $join => $join_alias )
+				{
+					$from .= ' INNER JOIN `' . $blog->table( $join ) . '` ' . $join_alias;
+					$from .= ' ON ' . $alias . '.`' . array_search( $join, WP_Super_Network::TABLES_TO_REPLACE[ $table ] ) . '` = ' . $join_alias . '.`' . array_search( $join, WP_Super_Network::TABLES_TO_REPLACE[ $join ] ) . '`';
+					$this->exclude( $where, $join, $blog, $join_alias );
+				}
+			}
 
 			if ( !$this->consolidated )
 			{
@@ -171,7 +193,8 @@ class Network
 				}
 			}
 
-			$tables[] = 'SELECT * FROM `' . $blog->table( $table ) . ( empty( $where ) ? '`' : ( '` WHERE ' . implode( ' AND ', $where ) ) );
+			$where = implode( ' AND ', $where );
+			$tables[] = 'SELECT ' . $cols . ' FROM ' . $from . ( empty( $where ) ? '' : ( ' WHERE ' . $where ) );
 		}
 
 		return implode( ' UNION ALL ', $tables );

@@ -75,6 +75,14 @@ class Network
 
 	private $meta_ids = array();
 
+	/**
+	 * Permalink Transformer instance.
+	 *
+	 * @since 1.3.0
+	 * @var Permalink_Transformer
+	 */
+	private $permalink_transformer;
+
 	public function shared_auto_increment( $post_ID, $post, $update )
 	{
 		if ( !$update && $this->consolidated )
@@ -384,6 +392,8 @@ class Network
 		$this->settings->add( $section3 );
 		$this->settings->add( $section2 );
 		$this->settings->add( $section );
+
+		$this->permalink_transformer = new Permalink_Transformer( $this );
 	}
 
 	public function add_new_post( $hook_suffix )
@@ -467,11 +477,8 @@ class Network
 		$this->settings->register();
 		$this->tools->register();
 
-		add_filter( 'post_type_link', array( $this, 'intercept_permalink_for_post' ), 10, 2 );
-		add_filter( 'post_link', array( $this, 'intercept_permalink_for_post' ), 10, 2 );
-		add_filter( 'page_link', array( $this, 'intercept_permalink' ), 10, 2 );
-		add_filter( 'preview_post_link', array( $this, 'intercept_preview_link' ), 10, 2 );
-		add_filter( 'supernetwork_preview_link', array( $this, 'replace_preview_link' ), 10, 2 );
+		$this->permalink_transformer->register_filters();
+
 		add_filter( 'user_has_cap', array( $this, 'intercept_capability' ), 10, 4 );
 		add_filter( 'pre_handle_404', array( $this, 'singular_access' ), 10, 2 );
 		add_action( 'wp', array( $this, 'preview_access' ) );
@@ -818,35 +825,6 @@ class Network
 			wp_cache_set( 'supernetwork_queries', $transformed, $query );
 			return $transformed->transformed;
 		}
-	}
-
-	public function intercept_permalink( $permalink, $post_ID )
-	{
-		if ( !doing_filter( 'supernetwork_preview_link' ) && !is_null( $blog = $this->get_blog( $post_ID ) ) )
-		{
-			switch_to_blog( $blog->id );
-			$permalink = get_permalink( $post_ID );
-			restore_current_blog();
-		}
-
-		return $permalink;
-	}
-
-	public function intercept_permalink_for_post( $permalink, $post )
-	{
-		return $this->intercept_permalink( $permalink, $post->ID );
-	}
-
-	public function intercept_preview_link( $preview_link, $post )
-	{
-		return doing_filter( 'supernetwork_preview_link' ) ? $preview_link : apply_filters( 'supernetwork_preview_link', $preview_link, $post );
-	}
-
-	public function replace_preview_link( $preview_link, $post )
-	{
-		$query_args = array();
-		parse_str( parse_url( $preview_link, PHP_URL_QUERY ), $query_args );
-		return get_preview_post_link( $post, array_intersect_key( $query_args, array( 'preview_nonce' => null, 'preview_id' => null ) ) );
 	}
 
 	public function intercept_capability( $allcaps, $caps, $args, $user )

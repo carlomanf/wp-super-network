@@ -100,7 +100,7 @@ class SQL_Expression extends SQL_Node
 				// Update replacements based on a column reference.
 				if ( $subnode['expr_type'] === 'colref' )
 				{
-					$replacements = call_user_func_array( 'array_merge', WP_Super_Network::TABLES_TO_REPLACE );
+					$replacements = call_user_func_array( 'array_merge', array_values( WP_Super_Network::TABLES_TO_REPLACE ) );
 					$col = array_reverse( $subnode['no_quotes']['parts'] )[0];
 
 					foreach ( $this->replacements as $entity => &$data )

@@ -156,9 +156,12 @@ class SQL_Expression extends SQL_Node
 				$this->clear_meta_id();
 			}
 
-			// One last time.
-			$this->clear_entity_id( $query );
-			$this->clear_meta_id();
+			if ( $node['expr_type'] !== 'in-list' )
+			{
+				// One last time.
+				$this->clear_entity_id( $query );
+				$this->clear_meta_id();
+			}
 		}
 	}
 

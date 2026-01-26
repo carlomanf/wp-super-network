@@ -77,7 +77,7 @@ class Query
 	 * Tables being joined.
 	 *
 	 * @since 1.3.0
-	 * @var WP_Super_Network\Table[]
+	 * @var WP_Super_Network\SQL_Table[]
 	 */
 	private $joins = array();
 
@@ -362,6 +362,20 @@ class Query
 	public function join( $table, $table_schema )
 	{
 		$this->joins[ $table_schema ] = $table;
+	}
+
+	/**
+	 * Checks if a table is joined in this query.
+	 *
+	 * @since 1.3.0
+	 *
+	 * @param string $table_schema Schema for the table.
+	 *
+	 * @return bool
+	 */
+	public function joined( $table_schema )
+	{
+		return array_key_exists( $table_schema, $this->joins );
 	}
 
 	/**

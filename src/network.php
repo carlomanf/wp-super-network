@@ -122,107 +122,13 @@ class Network
 
 	public function __get( $key )
 	{
-		if ( $key === 'consolidated' )
+		switch ( $key )
 		{
-			return $this->consolidated;
-		}
-
-		if ( $key === 'collisions' )
-		{
-			return $this->collisions;
-		}
-
-		if ( $key === 'republished' )
-		{
-			return $this->republished;
-		}
-
-		if ( $key === 'post_types' )
-		{
-			return $this->post_types;
-		}
-	}
-
-	public function union( $table )
-	{
-		// No need to do anything if not consolidated and no republished posts.
-		if ( !$this->consolidated && ( empty( $this->republished ) || empty( $post_cols = array_keys( WP_Super_Network::TABLES_TO_REPLACE[ $table ], 'posts', true ) ) ) )
-		{
-			return $GLOBALS['wpdb']->__get( $table );
-		}
-
-		$tables = array();
-		$alias = '';
-		$cols = '*';
-
-		if ( $table === 'term_relationships' )
-		{
-			$alias = 'tr';
-			$cols = $alias . '.' . $cols;
-		}
-
-		foreach ( $this->blogs as $blog )
-		{
-			$from = '`' . $blog->table( $table ) . '`';
-			$where = array();
-
-			$this->exclude( $where, $table, $blog, $alias );
-
-			if ( $table === 'term_relationships' )
-			{
-				$from .= ' ' . $alias;
-
-				foreach ( array( 'posts' => 'p', 'term_taxonomy' => 'tt' ) as $join => $join_alias )
-				{
-					$from .= ' INNER JOIN `' . $blog->table( $join ) . '` ' . $join_alias;
-					$from .= ' ON ' . $alias . '.`' . array_search( $join, WP_Super_Network::TABLES_TO_REPLACE[ $table ] ) . '` = ' . $join_alias . '.`' . array_search( $join, WP_Super_Network::TABLES_TO_REPLACE[ $join ] ) . '`';
-					$this->exclude( $where, $join, $blog, $join_alias );
-				}
-			}
-
-			if ( !$this->consolidated )
-			{
-				// Add republished posts.
-				if ( $blog->table( $table ) !== $GLOBALS['wpdb']->__get( $table ) )
-				{
-					foreach ( $post_cols as $col )
-					{
-						// Post parent is currently not being handled.
-						$col === 'post_parent' or $where[] = '`' . $col . '` IN (' . implode( ', ', $this->republished ) . ')';
-					}
-				}
-			}
-
-			$where = implode( ' AND ', $where );
-			$tables[] = 'SELECT ' . $cols . ' FROM ' . $from . ( empty( $where ) ? '' : ( ' WHERE ' . $where ) );
-		}
-
-		return implode( ' UNION ALL ', $tables );
-	}
-
-	public function exclude( &$where, $table, $blog, $alias = '' )
-	{
-		if ( $this->consolidated )
-		{
-			empty( $alias ) or $alias .= '.';
-
-			// Exclude any entities involved in collisions.
-			foreach ( array_keys( $this->collisions ) as $entity )
-			{
-				if ( !empty( $this->collisions[ $entity ] ) )
-				{
-					foreach ( array_keys( WP_Super_Network::TABLES_TO_REPLACE[ $table ], $entity, true ) as $col )
-					{
-						$where[] = $alias . '`' . $col . '` NOT IN (' . implode( ', ', $this->collisions[ $entity ] ) . ')';
-					}
-				}
-			}
-
-			// Exclude network-based post types.
-			if ( $table === 'posts' && !empty( $this->post_types ) && !$blog->is_network() )
-			{
-				$where[] = $alias . '`post_type` NOT IN (\'' . implode( '\', \'', $this->post_types ) . '\')';
-			}
+			case 'blogs': return $this->blogs;
+			case 'consolidated': return $this->consolidated;
+			case 'collisions': return $this->collisions;
+			case 'republished': return $this->republished;
+			case 'post_types': return $this->post_types;
 		}
 	}
 

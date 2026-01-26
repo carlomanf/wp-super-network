@@ -53,7 +53,7 @@ class SQL_Table extends SQL_Node
 					}
 				}
 
-				$use_union = $read_only && $suggestion->fresh() && ( $union = $query->network->union( $table_schema ) ) !== $table;
+				$use_union = $read_only && $suggestion->fresh() && ( $union = $this->union( $table_schema, $query ) ) !== $table;
 
 				if ( $use_union )
 				{
@@ -125,16 +125,35 @@ class SQL_Table extends SQL_Node
 	public function transform_for_blog( $blog_to_replace, $table_schema, $query )
 	{
 		$node = $this->original;
+		$semi_join_relationships = $this->read_only && $table_schema === 'term_relationships' && !$query->joined( 'posts' ) && !$query->joined( 'term_taxonomy' );
+
+		if ( $semi_join_relationships )
+		{
+			isset( $blog_to_replace ) or $blog_to_replace = $query->network->get_blog_by_id( get_current_blog_id() );
+
+			// Semi-join term_relationships with posts and/or term_taxonomy depending on queried IDs
+			$node['expr_type'] = 'subquery';
+			$node['base_expr'] = $this->subquery( $blog_to_replace, 'term_relationships', $query );
+			$node['sub_tree'] = $query->parser()->parse( $node['base_expr'] );
+
+			unset( $node['table'] );
+			unset( $node['no_quotes'] );
+		}
+		else
+		{
+			if ( isset( $blog_to_replace ) )
+			{
+				$node['table'] = $blog_to_replace->table( $table_schema );
+
+				$node['no_quotes'] = array(
+					'delim' => false,
+					'parts' => array( $node['table'] )
+				);
+			}
+		}
 
 		if ( isset( $blog_to_replace ) )
 		{
-			$node['table'] = $blog_to_replace->table( $table_schema );
-
-			$node['no_quotes'] = array(
-				'delim' => false,
-				'parts' => array( $node['table'] )
-			);
-
 			$this->read_only and $this->alias( $node, $GLOBALS['wpdb']->__get( $table_schema ) );
 
 			if ( isset( $node['table'] ) && isset( $node['alias'] ) && isset( $node['alias']['base_expr'] ) )
@@ -150,11 +169,135 @@ class SQL_Table extends SQL_Node
 		{
 			$blog = isset( $blog_to_replace ) ? $blog_to_replace : $query->network->get_blog_by_id( get_current_blog_id() );
 			$alias = isset( $node['alias'] ) && !empty( $node['alias']['name'] ) ? $node['alias']['name'] : $node['table'];
-			$query->network->exclude( $where, $table_schema, $blog, $alias );
+			$this->exclude( $where, $blog, $table_schema, $query, $alias );
 			empty( $where ) or $query->condition( implode( ' AND ', $where ) );
 		}
 
 		$this->transformed = $node;
-		$this->modified = isset( $blog_to_replace ) || !empty( $where );
+		$this->modified = $semi_join_relationships || isset( $blog_to_replace ) || !empty( $where );
+	}
+
+	/**
+	 * Constructs a UNION ALL SQL statement for the given table across all blogs in the network.
+	 *
+	 * @since 1.3.0
+	 *
+	 * @param string $table Table schema.
+	 * @param WP_Super_Network\Query $query Query context.
+	 *
+	 * @return string UNION ALL SQL statement.
+	 */
+	private function union( $table, $query )
+	{
+		// No need to do anything if not consolidated and no republished posts.
+		if ( !$query->network->consolidated && ( empty( $query->network->republished ) || empty( $post_cols = array_keys( WP_Super_Network::TABLES_TO_REPLACE[ $table ], 'posts', true ) ) ) )
+		{
+			return $GLOBALS['wpdb']->__get( $table );
+		}
+
+		$tables = array();
+
+		foreach ( $query->network->blogs as $blog )
+		{
+			$tables[] = $this->subquery( $blog, $table, $query );
+		}
+
+		return implode( ' UNION ALL ', $tables );
+	}
+
+	/**
+	 * Constructs a subquery for the given blog and table.
+	 *
+	 * @since 1.3.0
+	 *
+	 * @param WP_Super_Network\Blog $blog Blog context.
+	 * @param string $table Table schema.
+	 * @param WP_Super_Network\Query $query Query context.
+	 *
+	 * @return string Subquery SQL statement.
+	 */
+	private function subquery( $blog, $table, $query )
+	{
+		$alias = '';
+		$cols = '*';
+
+		if ( $table === 'term_relationships' )
+		{
+			$alias = 'tr';
+			$cols = $alias . '.' . $cols;
+		}
+
+		$from = '`' . $blog->table( $table ) . '`';
+		$where = array();
+
+		$this->exclude( $where, $blog, $table, $query, $alias );
+
+		if ( $table === 'term_relationships' )
+		{
+			$from .= ' ' . $alias;
+
+			foreach ( array( 'posts' => 'p', 'term_taxonomy' => 'tt' ) as $join => $join_alias )
+			{
+				if ( !$query->id_set( $query->replacements[ $join ] ) && !$query->column_set( $query->replacements[ $join ] ) )
+				{
+					$from .= ' INNER JOIN `' . $blog->table( $join ) . '` ' . $join_alias;
+					$from .= ' ON ' . $alias . '.`' . array_search( $join, WP_Super_Network::TABLES_TO_REPLACE[ $table ] ) . '` = ' . $join_alias . '.`' . array_search( $join, WP_Super_Network::TABLES_TO_REPLACE[ $join ] ) . '`';
+					$this->exclude( $where, $blog, $join, $query, $join_alias );
+				}
+			}
+		}
+
+		if ( !$query->network->consolidated )
+		{
+			// Add republished posts.
+			if ( $blog->table( $table ) !== $GLOBALS['wpdb']->__get( $table ) )
+			{
+				foreach ( array_keys( WP_Super_Network::TABLES_TO_REPLACE[ $table ], 'posts', true ) as $col )
+				{
+					// Post parent is currently not being handled.
+					$col === 'post_parent' or $where[] = '`' . $col . '` IN (' . implode( ', ', $query->network->republished ) . ')';
+				}
+			}
+		}
+
+		$where = implode( ' AND ', $where );
+		return 'SELECT ' . $cols . ' FROM ' . $from . ( empty( $where ) ? '' : ( ' WHERE ' . $where ) );
+	}
+
+	/**
+	 * Adds exclusion conditions to the WHERE clause for collisions and network-based post types.
+	 *
+	 * @since 1.3.0
+	 *
+	 * @param array $where Array of WHERE conditions, passed by reference.
+	 * @param WP_Super_Network\Blog $blog Blog context.
+	 * @param string $table Table schema.
+	 * @param WP_Super_Network\Query $query Query context.
+	 * @param string $alias Table alias, if any.
+	 */
+	private function exclude( &$where, $blog, $table, $query, $alias = '' )
+	{
+		if ( $query->network->consolidated )
+		{
+			empty( $alias ) or $alias .= '.';
+
+			// Exclude any entities involved in collisions.
+			foreach ( array_keys( $query->network->collisions ) as $entity )
+			{
+				if ( !empty( $query->network->collisions[ $entity ] ) )
+				{
+					foreach ( array_keys( WP_Super_Network::TABLES_TO_REPLACE[ $table ], $entity, true ) as $col )
+					{
+						$where[] = $alias . '`' . $col . '` NOT IN (' . implode( ', ', $query->network->collisions[ $entity ] ) . ')';
+					}
+				}
+			}
+
+			// Exclude network-based post types.
+			if ( $table === 'posts' && !empty( $query->network->post_types ) && !$blog->is_network() )
+			{
+				$where[] = $alias . '`post_type` NOT IN (\'' . implode( '\', \'', $query->network->post_types ) . '\')';
+			}
+		}
 	}
 }

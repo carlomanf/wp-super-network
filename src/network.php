@@ -732,7 +732,7 @@ class Network
 					'terms' => $blog->table( 'term_taxonomy' ) . ' tt LEFT JOIN ' . $blog->table( 'terms' ) . ' t ON tt.term_id = t.term_id'
 				);
 
-				$rows = $GLOBALS['wpdb']->get_results( 'SELECT `' . $fields[ $entity ][0] . '`, SUBSTRING(`' . $fields[ $entity ][1] . '`, 1, 500) AS `' . $fields[ $entity ][1] . '_preview`, `' . $fields[ $entity ][2] . '`, `' . $fields[ $entity ][3] . '` FROM ' . $tables[ $entity ] . ' WHERE `' . $id . '` = ' . $this->collisions[ $entity ][0], ARRAY_A );
+				$rows = $GLOBALS['wpdb']->get_results( 'SELECT `' . $fields[ $entity ][0] . '`, SUBSTRING(`' . $fields[ $entity ][1] . '`, 1, 500) AS `' . $fields[ $entity ][1] . '_preview`, `' . $fields[ $entity ][2] . '`, `' . $fields[ $entity ][3] . '` FROM ' . $tables[ $entity ] . ' WHERE ' . $id . ' = ' . $this->collisions[ $entity ][0], ARRAY_A );
 
 				// There may be more than one row if terms are not split.
 				foreach ( $rows as $key => $row )

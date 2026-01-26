@@ -7,6 +7,14 @@ namespace WP_Super_Network;
 class SQL_Table extends SQL_Node
 {
 	/**
+	 * Whether the query context is read only.
+	 *
+	 * @since 1.3.0
+	 * @var bool
+	 */
+	private $read_only;
+
+	/**
 	 * Constructor.
 	 * Replaces the table with either another table or a union, depending on the other information found in the WHERE clause.
 	 *
@@ -20,6 +28,7 @@ class SQL_Table extends SQL_Node
 	{
 		parent::__construct( $node );
 
+		$this->read_only = $read_only;
 		$table = array_reverse( $node['no_quotes']['parts'] )[0];
 
 		// Find whether this is a replaceable core table.
@@ -46,7 +55,6 @@ class SQL_Table extends SQL_Node
 
 				$use_union = $read_only && $suggestion->fresh() && ( $union = $query->network->union( $table_schema ) ) !== $table;
 
-				// if relationships table, add the join of either posts or taxonomy table if not joined already
 				if ( $use_union )
 				{
 					// Replace the table with a union.
@@ -127,7 +135,7 @@ class SQL_Table extends SQL_Node
 				'parts' => array( $node['table'] )
 			);
 
-			$this->alias( $node, $GLOBALS['wpdb']->__get( $table_schema ) );
+			$this->read_only and $this->alias( $node, $GLOBALS['wpdb']->__get( $table_schema ) );
 
 			if ( isset( $node['table'] ) && isset( $node['alias'] ) && isset( $node['alias']['base_expr'] ) )
 			{

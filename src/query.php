@@ -299,6 +299,15 @@ class Query
 				else
 				{
 					$transformed = $this->transform_node( $parsed[ $key ], $clause );
+					$parsed[ $key ] = $transformed;
+				}
+			}
+
+			foreach ( array_reverse( array_keys( $parsed ) ) as $key )
+			{
+				if ( !is_string( $key ) )
+				{
+					$transformed = $parsed[ $key ];
 					$parsed[ $key ] = $transformed->transformed;
 					$modified = $modified || $transformed->modified;
 				}

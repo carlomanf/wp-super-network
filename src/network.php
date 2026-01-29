@@ -839,6 +839,38 @@ class Network
 		return $this->blog_cache[ $entity ][ $id ] = null;
 	}
 
+	public function get_table_schema( $table )
+	{
+		// Remove base prefix
+		if ( strpos( $table, $GLOBALS['wpdb']->base_prefix ) !== 0 )
+		{
+			return '';
+		}
+
+		$suffix = substr( $table, strlen( $GLOBALS['wpdb']->base_prefix ) );
+
+		// Parse blog_id and table_schema
+		if ( preg_match( '/^([2-9]|[1-9]\d+)_(.+)$/', $suffix, $matches ) )
+		{
+			$blog_id = (int) $matches[1];
+			$table_schema = $matches[2];
+		}
+		else
+		{
+			$blog_id = 1;
+			$table_schema = $suffix;
+		}
+
+		if ( array_key_exists( $table_schema, WP_Super_Network::TABLES_TO_REPLACE ) && isset( $this->blogs[ $blog_id ] ) )
+		{
+			return $table_schema;
+		}
+		else
+		{
+			return '';
+		}
+	}
+
 	public function get_blog_by_id( $id )
 	{
 		return isset( $this->blogs[ $id ] ) ? $this->blogs[ $id ] : null;

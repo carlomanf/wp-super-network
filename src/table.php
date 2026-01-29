@@ -32,11 +32,9 @@ class SQL_Table extends SQL_Node
 		$table = array_reverse( $node['no_quotes']['parts'] )[0];
 
 		// Find whether this is a replaceable core table.
-		foreach ( WP_Super_Network::TABLES_TO_REPLACE as $table_schema => $tables )
-		{
-			$local_table = $GLOBALS['wpdb']->__get( $table_schema );
+		$table_schema = $query->network->get_table_schema( $table );
 
-			if ( $table === $local_table )
+		if ( !empty( $table_schema ) )
 			{
 				$query->join( $this, $table_schema );
 
@@ -45,7 +43,7 @@ class SQL_Table extends SQL_Node
 				$suggestion = $query->suggestion;
 
 				// Replace queries targeting a single entity.
-				foreach ( $tables as $column => $entity )
+			foreach ( WP_Super_Network::TABLES_TO_REPLACE[ $table_schema ] as $column => $entity )
 				{
 					if ( $query->id_set( $replacements[ $entity ] ) && $query->column_set( $replacements[ $entity ] ) && $replacements[ $entity ]['column'] === $column )
 					{
@@ -53,19 +51,27 @@ class SQL_Table extends SQL_Node
 					}
 				}
 
-				$use_union = $read_only && $suggestion->fresh() && ( $union = $this->union( $table_schema, $query ) ) !== $table;
+			// No need to union if not a read only query, a blog is suggested or not consolidated and no republished posts.
+			if ( $read_only && $suggestion->fresh() && ( $query->network->consolidated || !empty( $query->network->republished ) && !empty( array_keys( WP_Super_Network::TABLES_TO_REPLACE[ $table_schema ], 'posts', true ) ) ) )
+			{
+				$subquery = array();
 
-				if ( $use_union )
+				foreach ( $query->network->blogs as $blog )
 				{
+					$subquery[] = $this->subquery( $blog, $table_schema, $query );
+				}
+
+				$subquery = implode( ' UNION ALL ', $subquery );
+
 					// Replace the table with a union.
 					$node['expr_type'] = 'subquery';
-					$node['base_expr'] = $union;
-					$node['sub_tree'] = $query->parser()->parse( $union );
+				$node['base_expr'] = $subquery;
+				$node['sub_tree'] = $query->parser()->parse( $subquery );
 
 					unset( $node['table'] );
 					unset( $node['no_quotes'] );
 
-					$this->alias( $node, $local_table );
+				$this->alias( $node, $table );
 
 					$this->transformed = $node;
 					$this->modified = true;
@@ -82,9 +88,6 @@ class SQL_Table extends SQL_Node
 					// Replace the table with another blog.
 					$query->transform_joins();
 				}
-
-				return;
-			}
 		}
 	}
 
@@ -125,6 +128,7 @@ class SQL_Table extends SQL_Node
 	public function transform_for_blog( $blog_to_replace, $table_schema, $query )
 	{
 		$node = $this->original;
+		$table = array_reverse( $node['no_quotes']['parts'] )[0];
 		$semi_join_relationships = $this->read_only && $table_schema === 'term_relationships' && !$query->joined( 'posts' ) && !$query->joined( 'term_taxonomy' );
 
 		if ( $semi_join_relationships )
@@ -154,7 +158,7 @@ class SQL_Table extends SQL_Node
 
 		if ( isset( $blog_to_replace ) )
 		{
-			$this->read_only and $this->alias( $node, $GLOBALS['wpdb']->__get( $table_schema ) );
+			$this->read_only and $this->alias( $node, $table );
 
 			if ( isset( $node['table'] ) && isset( $node['alias'] ) && isset( $node['alias']['base_expr'] ) )
 			{
@@ -175,34 +179,6 @@ class SQL_Table extends SQL_Node
 
 		$this->transformed = $node;
 		$this->modified = $semi_join_relationships || isset( $blog_to_replace ) || !empty( $where );
-	}
-
-	/**
-	 * Constructs a UNION ALL SQL statement for the given table across all blogs in the network.
-	 *
-	 * @since 1.3.0
-	 *
-	 * @param string $table Table schema.
-	 * @param WP_Super_Network\Query $query Query context.
-	 *
-	 * @return string UNION ALL SQL statement.
-	 */
-	private function union( $table, $query )
-	{
-		// No need to do anything if not consolidated and no republished posts.
-		if ( !$query->network->consolidated && ( empty( $query->network->republished ) || empty( $post_cols = array_keys( WP_Super_Network::TABLES_TO_REPLACE[ $table ], 'posts', true ) ) ) )
-		{
-			return $GLOBALS['wpdb']->__get( $table );
-		}
-
-		$tables = array();
-
-		foreach ( $query->network->blogs as $blog )
-		{
-			$tables[] = $this->subquery( $blog, $table, $query );
-		}
-
-		return implode( ' UNION ALL ', $tables );
 	}
 
 	/**
@@ -250,7 +226,7 @@ class SQL_Table extends SQL_Node
 		if ( !$query->network->consolidated )
 		{
 			// Add republished posts.
-			if ( $blog->table( $table ) !== $GLOBALS['wpdb']->__get( $table ) )
+			if ( get_current_blog_id() !== $blog->id )
 			{
 				foreach ( array_keys( WP_Super_Network::TABLES_TO_REPLACE[ $table ], 'posts', true ) as $col )
 				{

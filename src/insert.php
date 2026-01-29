@@ -20,8 +20,8 @@ class SQL_Table_For_Insert extends SQL_Node
 		parent::__construct( $node );
 
 		$table = array_reverse( $node['no_quotes']['parts'] )[0];
-		$is_posts_table = $GLOBALS['wpdb']->__get( 'posts' ) === $table;
-		$is_relationships_table = $GLOBALS['wpdb']->__get( 'term_relationships' ) === $table;
+		$is_posts_table = $query->network->get_table_schema( $table ) === 'posts';
+		$is_relationships_table = $query->network->get_table_schema( $table ) === 'term_relationships';
 
 		$table_to_replace = null;
 		$entities_to_replace = array();
@@ -40,7 +40,7 @@ class SQL_Table_For_Insert extends SQL_Node
 					// If it's a replaceable column, note the table to replace.
 					foreach ( WP_Super_Network::TABLES_TO_REPLACE as $table_schema => $tables )
 					{
-						if ( isset( $tables[ $col ] ) && ( $table_schema !== $tables[ $col ] || $col === 'post_parent' ) && $GLOBALS['wpdb']->__get( $table_schema ) === $table )
+						if ( isset( $tables[ $col ] ) && ( $table_schema !== $tables[ $col ] || $col === 'post_parent' ) && $query->network->get_table_schema( $table ) === $table_schema )
 						{
 							$table_to_replace = $table_schema;
 							$entities_to_replace[ $tables[ $col ] ] = $key;

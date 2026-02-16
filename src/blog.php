@@ -86,8 +86,13 @@ class Blog
 	 * Pop blog out of its network and create a new network.
 	 *
 	 * @since 1.0.4
+	 * @since 1.3.0 Added `$network` parameter and return type.
+	 *
+	 * @param WP_Super_Network\Network|null $network Network of this blog, if known.
+	 *
+	 * @return WP_Super_Network\Network The network the blog was upgraded to.
 	 */
-	public function upgrade_to_network()
+	public function upgrade_to_network( $network = null )
 	{
 		if ( !$this->is_network() )
 		{
@@ -98,5 +103,19 @@ class Blog
 			update_network_option( $this->subnetwork_id, 'main_site', $this->id );
 			restore_current_blog();
 		}
+
+		return new Network( get_network( $this->subnetwork_id ), $network );
+	}
+
+	/**
+	 * Check if this blog's depth allows the current user to upgrade it to network.
+	 *
+	 * @since 1.3.0
+	 *
+	 * @return bool True if user can, false otherwise.
+	 */
+	public function depth_allowed()
+	{
+		return current_user_can_for_blog( $this->id, 'activate_network' );
 	}
 }

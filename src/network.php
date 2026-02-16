@@ -7,6 +7,14 @@ namespace WP_Super_Network;
 class Network
 {
 	/**
+	 * Network object
+	 *
+	 * @since 1.3.0
+	 * @var WP_Network
+	 */
+	private $wp_network;
+
+	/**
 	 * Supernetwork
 	 *
 	 * @since 1.0.4
@@ -15,12 +23,20 @@ class Network
 	private $supernetwork;
 
 	/**
+	 * Supernetworks
+	 *
+	 * @since 1.3.0
+	 * @var array
+	 */
+	private $supernetworks = array();
+
+	/**
 	 * Subnetworks
 	 *
 	 * @since 1.0.4
 	 * @var array
 	 */
-	private $subnetworks;
+	private $subnetworks = array();
 
 	/**
 	 * Blogs in the network.
@@ -111,7 +127,7 @@ class Network
 
 	private function set_auto_increment( $new, $entity = 'posts' )
 	{
-		foreach ( $this->blogs as $blog )
+		foreach ( $this->__get( 'blogs' ) as $blog )
 		{
 			if ( $new > (int) $GLOBALS['wpdb']->get_var( 'SELECT `auto_increment` FROM `information_schema`.`tables` WHERE `table_schema` = \'' . DB_NAME . '\' AND `table_name` = \'' . $blog->table( $entity ) . '\'' ) )
 			{
@@ -124,11 +140,12 @@ class Network
 	{
 		switch ( $key )
 		{
-			case 'blogs': return $this->blogs;
+			case 'blogs': return array_replace( $this->blogs, ...$this->supernetworks, ...$this->subnetworks );
 			case 'consolidated': return $this->consolidated;
 			case 'collisions': return $this->collisions;
 			case 'republished': return $this->republished;
 			case 'post_types': return $this->post_types;
+			case 'supernetwork': return $this->supernetwork;
 		}
 	}
 
@@ -165,17 +182,35 @@ class Network
 	 * Queries sent during this method do not get modified, as the filter is applied later.
 	 *
 	 * @since 1.0.4
+	 * @since 1.3.0 Added `$supernetwork` parameter.
 	 *
-	 * @param WP_Network
+	 * @param WP_Network $network Network object.
+	 * @param WP_Super_Network\Network|null $supernetwork Supernetwork object, if any.
 	 */
-	public function __construct( $network )
+	public function __construct( $network, $supernetwork = null )
 	{
+		$this->wp_network = $network;
 		$blogs_labels = array();
 
 		foreach ( get_sites( 'network_id=' . $network->id ) as $site )
 		{
 			$this->blogs[ (int) $site->blog_id ] = new Blog( $site );
 			$this->blogs[ (int) $site->blog_id ]->is_network() or $blogs_labels[ $site->blog_id ] = $site->blogname;
+		}
+
+		// Populate $supernetwork: find parent network via this network's main site
+		$main_site = get_site( $network->site_id );
+
+		if ( !empty( $main_site ) && $main_site->network_id !== $network->id )
+		{
+			if ( isset( $supernetwork ) && $supernetwork->wp_network->id === $main_site->network_id )
+			{
+				$this->supernetwork = $supernetwork;
+			}
+			else
+			{
+				$this->supernetwork = new Network( get_network( $main_site->network_id ) );
+			}
 		}
 
 		$this->tools = new Tools_Page(
@@ -311,7 +346,7 @@ class Network
 			$edit = isset( $post_type ) ? $type->cap->edit_posts : 'do_not_allow';
 			$create = isset( $post_type ) ? $type->cap->create_posts : 'do_not_allow';
 
-			foreach ( $this->blogs as $blog )
+			foreach ( $this->__get( 'blogs' ) as $blog )
 			{
 				$id = $blog->id;
 
@@ -368,8 +403,46 @@ class Network
 		return $meta_ids;
 	}
 
+	/**
+	 * Populates subnetworks for a given blog.
+	 *
+	 * @access private
+	 *
+	 * @since 1.3.0
+	 *
+	 * @param WP_Super_Network\Blog $blog Blog to set subnetworks for.
+	 * @param WP_Super_Network\Network $supernetwork Network that the blog belongs to.
+	 */
+	private function set_subnetwork_blogs( $blog, $supernetwork )
+	{
+		if ( $blog->is_network() && $blog->depth_allowed() && $blog->id !== $supernetwork->wp_network->site_id )
+		{
+			$network = $blog->upgrade_to_network( $supernetwork );
+			$this->subnetworks[ $blog->id ] = $network->blogs;
+
+			foreach ( $this->subnetworks[ $blog->id ] as $subnetwork_blog )
+			{
+				$this->set_subnetwork_blogs( $subnetwork_blog, $network );
+			}
+		}
+	}
+
 	public function register()
 	{
+		$supernetwork = $this->supernetwork;
+
+		while ( isset( $supernetwork ) )
+		{
+			$this->supernetworks[] = $supernetwork->blogs;
+			$supernetwork = $supernetwork->supernetwork;
+		}
+
+		// Populate $subnetworks: store blog IDs that are networks
+		foreach ( $this->blogs as $blog )
+		{
+			$this->set_subnetwork_blogs( $blog, $this );
+		}
+
 		$this->settings->register();
 		$this->tools->register();
 
@@ -508,7 +581,7 @@ class Network
 		{
 			$success = true;
 
-			foreach ( $this->blogs as $blog )
+			foreach ( $this->__get( 'blogs' ) as $blog )
 			{
 				if ( $blog->id !== (int) explode( '_', $_POST[ 'supernetwork_' . $entity . '_collision_' . $this->collisions[ $entity ][0] ] )[0] )
 				{
@@ -629,7 +702,7 @@ class Network
 			echo '<thead><tr><th scope="col">Keep?</th><th scope="col">' . $labels[ $entity ][0] . '</th><th scope="col">' . $labels[ $entity ][1] . '</th><th scope="col">' . $labels[ $entity ][2] . '</th><th scope="col">' . $labels[ $entity ][3] . '</th><th scope="col">' . $labels[ $entity ][4] . '</th></tr></thead>';
 			echo '<tbody>';
 
-			foreach ( $this->blogs as $blog )
+			foreach ( $this->__get( 'blogs' ) as $blog )
 			{
 				$tables = array(
 					'comments' => $blog->table( 'comments' ) . ' LEFT JOIN ' . $blog->table( 'posts' ) . ' ON comment_post_ID = ID',
@@ -687,7 +760,10 @@ class Network
 		{
 			foreach ( $this->blogs as $blog )
 			{
-				empty( $_POST['activate'][ (string) $blog->id ] ) or $blog->upgrade_to_network();
+				if ( !empty( $_POST['activate'][ (string) $blog->id ] ) && $blog->depth_allowed() )
+				{
+					$blog->upgrade_to_network();
+				}
 			}
 		}
 	}
@@ -808,7 +884,7 @@ class Network
 			$this->consolidated = false;
 			$this->republished = array();
 
-			foreach ( $this->blogs as $blog )
+			foreach ( $this->__get( 'blogs' ) as $blog )
 			{
 				if ( !$old_consolidated )
 				{
@@ -861,7 +937,7 @@ class Network
 			$table_schema = $suffix;
 		}
 
-		if ( array_key_exists( $table_schema, WP_Super_Network::TABLES_TO_REPLACE ) && isset( $this->blogs[ $blog_id ] ) )
+		if ( array_key_exists( $table_schema, WP_Super_Network::TABLES_TO_REPLACE ) && array_key_exists( $blog_id, $this->__get( 'blogs' ) ) )
 		{
 			return $table_schema;
 		}
@@ -873,6 +949,7 @@ class Network
 
 	public function get_blog_by_id( $id )
 	{
-		return isset( $this->blogs[ $id ] ) ? $this->blogs[ $id ] : null;
+		$blogs = $this->__get( 'blogs' );
+		return isset( $blogs[ $id ] ) ? $blogs[ $id ] : null;
 	}
 }

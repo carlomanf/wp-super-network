@@ -172,7 +172,8 @@ class WP_Super_Network
 		add_filter( 'delete_post_metadata_by_mid', '__return_false' );
 		add_filter( 'delete_term_metadata_by_mid', '__return_false' );
 
-		$this->network->register();
+		// Register network.
+		add_action( 'plugins_loaded', array( $this->network, 'register' ) );
 
 		if ( !$this->network->consolidated )
 		{

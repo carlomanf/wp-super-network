@@ -4,7 +4,7 @@
  * Plugin URI:
  * Description: Share content between sites and create offspring networks.
  * Version: 1.2.0
- * Requires at least: 5.0
+ * Requires at least: 6.1
  * Requires PHP: 7.2
  * Author: Ask Carlo
  * Author URI: https://askcarlo.com

@@ -114,8 +114,78 @@ class Blog
 	 *
 	 * @return bool True if user can, false otherwise.
 	 */
-	public function depth_allowed()
+	public function can_be_upgraded()
 	{
-		return current_user_can_for_blog( $this->id, 'activate_network' );
+		return $this->check_capability( $this->id ) && $this->check_depth( $this->id ) !== 0;
+	}
+
+	/**
+	 * Check if the current user has the capability to upgrade a blog to network.
+	 * Capability is automatically inherited by subnetworks.
+	 *
+	 * @since 1.3.0
+	 *
+	 * @param int $blog_id ID of the blog to check.
+	 *
+	 * @return bool True if user can, false otherwise.
+	 */
+	private function check_capability( $blog_id )
+	{
+		$blog = get_site( $blog_id );
+
+		if ( $blog_id === 0 || $blog === null )
+		{
+			return false;
+		}
+		else
+		{
+			if ( current_user_can_for_blog( $blog_id, 'activate_network' ) )
+			{
+				return true;
+			}
+			else
+			{
+				$main_site_id = get_main_site_id( $blog->network_id );
+				return $main_site_id === $blog_id ? false : $this->check_capability( $main_site_id );
+			}
+		}
+	}
+
+	/**
+	 * Returns a blog's depth as an integer, where -1 is unlimited and 0 is not allowed.
+	 * Checks the `supernetwork_depth` option.
+	 *
+	 * @since 1.3.0
+	 *
+	 * @param int $blog_id ID of the blog to check.
+	 *
+	 * @return int Depth allowed for this blog.
+	 */
+	private function check_depth( $blog_id )
+	{
+		$blog = get_site( $blog_id );
+
+		if ( $blog_id === 0 || $blog === null )
+		{
+			return -1;
+		}
+
+		$depth_allowed = (int) get_blog_option( $blog_id, 'supernetwork_depth', '-1' );
+		$main_site_id = get_main_site_id( $blog->network_id );
+		$max_depth_allowed = $main_site_id === $blog_id ? -2 : $this->check_depth( $main_site_id ) - 1;
+
+		if ( $max_depth_allowed < 0 )
+		{
+			$max_depth_allowed++;
+		}
+
+		if ( $depth_allowed < 0 )
+		{
+			return $max_depth_allowed;
+		}
+		else
+		{
+			return $max_depth_allowed < 0 ? $depth_allowed : min( $depth_allowed, $max_depth_allowed );
+		}
 	}
 }

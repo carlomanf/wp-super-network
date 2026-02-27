@@ -415,7 +415,7 @@ class Network
 	 */
 	private function set_subnetwork_blogs( $blog, $supernetwork )
 	{
-		if ( $blog->is_network() && $blog->depth_allowed() && $blog->id !== $supernetwork->wp_network->site_id )
+		if ( $blog->is_network() && $blog->can_be_upgraded() && $blog->id !== $supernetwork->wp_network->site_id )
 		{
 			$network = $blog->upgrade_to_network( $supernetwork );
 			$this->subnetworks[ $blog->id ] = $network->blogs;
@@ -760,7 +760,7 @@ class Network
 		{
 			foreach ( $this->blogs as $blog )
 			{
-				if ( !empty( $_POST['activate'][ (string) $blog->id ] ) && $blog->depth_allowed() )
+				if ( !empty( $_POST['activate'][ (string) $blog->id ] ) && $blog->can_be_upgraded() )
 				{
 					$blog->upgrade_to_network();
 				}

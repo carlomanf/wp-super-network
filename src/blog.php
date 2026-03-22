@@ -108,15 +108,18 @@ class Blog
 	}
 
 	/**
-	 * Check if this blog's depth allows the current user to upgrade it to network.
+	 * Check if this blog's depth allows the user to upgrade it to network.
 	 *
 	 * @since 1.3.0
 	 *
+	 * @param int $user_id ID of the user to check. 0 for current user. Default 0.
+	 *
 	 * @return bool True if user can, false otherwise.
 	 */
-	public function can_be_upgraded()
+	public function can_be_upgraded( $user_id = 0 )
 	{
-		return $this->check_capability( $this->id ) && $this->check_depth( $this->id ) !== 0;
+		$user_id = $user_id === 0 ? get_current_user_id() : $user_id;
+		return $this->check_capability( $this->id, $user_id ) && $this->check_depth( $this->id ) !== 0;
 	}
 
 	/**
@@ -126,10 +129,11 @@ class Blog
 	 * @since 1.3.0
 	 *
 	 * @param int $blog_id ID of the blog to check.
+	 * @param int $user_id ID of the user to check.
 	 *
 	 * @return bool True if user can, false otherwise.
 	 */
-	private function check_capability( $blog_id )
+	private function check_capability( $blog_id, $user_id )
 	{
 		$blog = get_site( $blog_id );
 
@@ -139,14 +143,14 @@ class Blog
 		}
 		else
 		{
-			if ( current_user_can_for_blog( $blog_id, 'activate_network' ) )
+			if ( user_can_for_site( $user_id, $blog_id, 'activate_network' ) )
 			{
 				return true;
 			}
 			else
 			{
 				$main_site_id = get_main_site_id( $blog->network_id );
-				return $main_site_id === $blog_id ? false : $this->check_capability( $main_site_id );
+				return $main_site_id === $blog_id ? false : $this->check_capability( $main_site_id, $user_id );
 			}
 		}
 	}

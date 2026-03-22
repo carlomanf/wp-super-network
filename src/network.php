@@ -201,7 +201,7 @@ class Network
 		// Populate $supernetwork: find parent network via this network's main site
 		$main_site = get_site( $network->site_id );
 
-		if ( !empty( $main_site ) && $main_site->network_id !== $network->id )
+		if ( $network->site_id !== 0 && !empty( $main_site ) && $main_site->network_id !== $network->id )
 		{
 			if ( isset( $supernetwork ) && $supernetwork->wp_network->id === $main_site->network_id )
 			{

@@ -30,64 +30,67 @@ class SQL_Table extends SQL_Node
 
 		$this->read_only = $read_only;
 		$table = array_reverse( $node['no_quotes']['parts'] )[0];
+		$network = $query->network;
 
 		// Find whether this is a replaceable core table.
-		$table_schema = $query->network->get_table_schema( $table );
+		$table_schema = $network->get_table_schema( $table );
 
 		if ( !empty( $table_schema ) )
-			{
-				$query->join( $this, $table_schema );
+		{
+			$query->join( $this, $table_schema );
 
-				$replacements = $query->replacements;
-				$meta_ids = $query->meta_ids;
-				$suggestion = $query->suggestion;
+			$replacements = $query->replacements;
+			$meta_ids = $query->meta_ids;
+			$suggestion = $query->suggestion;
 
-				// Replace queries targeting a single entity.
+			// Replace queries targeting a single entity.
 			foreach ( WP_Super_Network::TABLES_TO_REPLACE[ $table_schema ] as $column => $entity )
+			{
+				if ( $query->id_set( $replacements[ $entity ] ) && $query->column_set( $replacements[ $entity ] ) && $replacements[ $entity ]['column'] === $column )
 				{
-					if ( $query->id_set( $replacements[ $entity ] ) && $query->column_set( $replacements[ $entity ] ) && $replacements[ $entity ]['column'] === $column )
-					{
-						$suggestion->suggest_blog( $query->network->get_blog( $replacements[ $entity ]['id'], $entity ) );
-					}
+					$suggestion->suggest_blog( $network->get_blog( $replacements[ $entity ]['id'], $entity ) );
 				}
+			}
+
+			$republished = $network->republished;
 
 			// No need to union if not a read only query, a blog is suggested or not consolidated and no republished posts.
-			if ( $read_only && $suggestion->fresh() && ( $query->network->consolidated || !empty( $query->network->republished ) && !empty( array_keys( WP_Super_Network::TABLES_TO_REPLACE[ $table_schema ], 'posts', true ) ) ) )
+			if ( $read_only && $suggestion->fresh() && ( $network->consolidated || !empty( $republished ) && !empty( array_keys( WP_Super_Network::TABLES_TO_REPLACE[ $table_schema ], 'posts', true ) ) ) )
 			{
 				$subquery = array();
 
-				foreach ( $query->network->blogs as $blog )
+				foreach ( $network->blogs as $blog )
 				{
 					$subquery[] = $this->subquery( $blog, $table_schema, $query );
 				}
 
 				$subquery = implode( ' UNION ALL ', $subquery );
 
-					// Replace the table with a union.
-					$node['expr_type'] = 'subquery';
+				// Replace the table with a union.
+				$node['expr_type'] = 'subquery';
 				$node['base_expr'] = $subquery;
 				$node['sub_tree'] = $query->parser()->parse( $subquery );
 
-					unset( $node['table'] );
-					unset( $node['no_quotes'] );
+				unset( $node['table'] );
+				unset( $node['no_quotes'] );
 
 				$this->alias( $node, $table );
 
-					$this->transformed = $node;
-					$this->modified = true;
-				}
-				else
+				$this->transformed = $node;
+				$this->modified = true;
+			}
+			else
+			{
+				// Replace update/delete for meta tables.
+				if ( !$read_only && in_array( $table_schema, array( 'commentmeta', 'postmeta', 'termmeta' ), true ) && !empty( $meta_ids ) && $meta_ids === $network->meta_ids() )
 				{
-					// Replace update/delete for meta tables.
-					if ( !$read_only && in_array( $table_schema, array( 'commentmeta', 'postmeta', 'termmeta' ), true ) && !empty( $meta_ids ) && $meta_ids === $query->network->meta_ids() )
-					{
-						$suggestion->suggest_blog( $query->network->get_blog( $query->network->meta_object_id(), str_replace( 'meta', 's', $table_schema ) ) );
-						$query->network->pop_meta_ids();
-					}
-
-					// Replace the table with another blog.
-					$query->transform_joins();
+					$suggestion->suggest_blog( $network->get_blog( $network->meta_object_id(), str_replace( 'meta', 's', $table_schema ) ) );
+					$network->pop_meta_ids();
 				}
+
+				// Replace the table with another blog.
+				$query->transform_joins();
+			}
 		}
 	}
 
@@ -253,26 +256,31 @@ class SQL_Table extends SQL_Node
 	 */
 	private function exclude( &$where, $blog, $table, $query, $alias = '' )
 	{
-		if ( $query->network->consolidated )
+		$network = $query->network;
+
+		if ( $network->consolidated )
 		{
 			empty( $alias ) or $alias .= '.';
 
+			$collisions = $network->collisions;
+			$post_types = $network->post_types;
+
 			// Exclude any entities involved in collisions.
-			foreach ( array_keys( $query->network->collisions ) as $entity )
+			foreach ( array_keys( $collisions ) as $entity )
 			{
-				if ( !empty( $query->network->collisions[ $entity ] ) )
+				if ( !empty( $collisions[ $entity ] ) )
 				{
 					foreach ( array_keys( WP_Super_Network::TABLES_TO_REPLACE[ $table ], $entity, true ) as $col )
 					{
-						$where[] = $alias . '`' . $col . '` NOT IN (' . implode( ', ', $query->network->collisions[ $entity ] ) . ')';
+						$where[] = $alias . '`' . $col . '` NOT IN (' . implode( ', ', $collisions[ $entity ] ) . ')';
 					}
 				}
 			}
 
 			// Exclude network-based post types.
-			if ( $table === 'posts' && !empty( $query->network->post_types ) && !$blog->is_network() )
+			if ( $table === 'posts' && !empty( $post_types ) && !$blog->is_network() )
 			{
-				$where[] = $alias . '`post_type` NOT IN (\'' . implode( '\', \'', $query->network->post_types ) . '\')';
+				$where[] = $alias . '`post_type` NOT IN (\'' . implode( '\', \'', $post_types ) . '\')';
 			}
 		}
 	}

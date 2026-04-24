@@ -73,11 +73,12 @@ class Input_Field
 		);
 
 		$options = get_option( $setting );
+		$options = empty( $field ) ? array( '' => $options ) : $options;
 
 		if ( $type === 'select' && is_array( $labels ) )
 		{
 			// Format for the name and ID attributes
-			$name = sprintf( '%s[%s]', $setting, $field );
+			$name = empty( $field ) ? $setting : sprintf( '%s[%s]', $setting, $field );
 
 			printf( '<select id="%1$s" name="%1$s">', $name );
 
@@ -117,7 +118,7 @@ class Input_Field
 			$did_one = true;
 
 			// Format for the name and ID attributes
-			$name = sprintf( '%s[%s]', $setting, $key );
+			$name = empty( $key ) ? $setting : sprintf( '%s[%s]', $setting, $key );
 
 			// Handle checkboxes
 			if ( 'checkbox' === $type )
@@ -142,7 +143,7 @@ class Input_Field
 				$value = isset( $options[ $key ] ) ? apply_filters( $name, $options[ $key ] ) : '';
 
 				// Handle single line text fields
-				if ( 'text' === $type )
+				if ( in_array( $type, array( 'text', 'number' ), true ) )
 				{
 					if ( !empty( $label ) && is_array( $labels ) )
 						printf( '<label for="%s">', $name );

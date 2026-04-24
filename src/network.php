@@ -256,7 +256,7 @@ class Network
 		$this->tools->add( $activate );
 
 		$this->settings = new Settings_Page(
-			array( 'supernetwork_options', 'supernetwork_post_types', 'supernetwork_consolidated' ),
+			array( 'supernetwork_options', 'supernetwork_post_types', 'supernetwork_consolidated', 'supernetwork_depth' ),
 			'Network Settings',
 			'Network',
 			'manage_network_options',
@@ -306,8 +306,8 @@ class Network
 		);
 
 		$section3 = new Input_Section(
-			'consolidated',
-			'Consolidated Mode'
+			'general',
+			'General Settings'
 		);
 
 		$field3 = new Input_Field(
@@ -319,9 +319,28 @@ class Network
 			'<strong>Warning:</strong> Consolidated mode is recommended for fresh networks. If you have pre-existing data (e.g. posts and pages) on your network, some of it may not be compatible with consolidated mode.'
 		);
 
+		$field4 = new Input_Field(
+			'supernetwork_depth',
+			'',
+			'number',
+			'Subnetwork Depth Limit',
+			'Set the maximum depth of subnetworks that can be activated from this network.',
+			'Enter -1 for unlimited depth, or a positive number.'
+		);
+
+		$field5 = new Input_Field(
+			'supernetwork_consolidated',
+			'auto_activate',
+			'checkbox',
+			'Subnetwork Activation',
+			'Automatically activate subnetworks as new sites are added to the network?'
+		);
+
 		$section->add( $field );
 		$section2->add( $field2 );
 		$section3->add( $field3 );
+		$section3->add( $field4 );
+		$section3->add( $field5 );
 		$this->settings->add( $section3 );
 		$this->settings->add( $section2 );
 		$this->settings->add( $section );
@@ -454,6 +473,7 @@ class Network
 		add_filter( 'user_has_cap', array( $this, 'intercept_capability' ), 10, 4 );
 		add_filter( 'pre_handle_404', array( $this, 'singular_access' ), 10, 2 );
 		add_action( 'wp', array( $this, 'preview_access' ) );
+		add_action( 'wp_initialize_site', array( $this, 'auto_activate_subnetwork' ) );
 		add_filter( 'query', array( $this, 'intercept_query' ), 10, 2 );
 		add_filter( 'wp_insert_post', array( $this, 'shared_auto_increment' ), 10, 3 );
 		add_filter( 'wp_insert_comment', array( $this, 'auto_increment_comments' ), 10, 2 );
@@ -763,6 +783,31 @@ class Network
 				if ( !empty( $_POST['activate'][ (string) $blog->id ] ) && $blog->can_be_upgraded() )
 				{
 					$blog->upgrade_to_network();
+				}
+			}
+		}
+	}
+
+	/**
+	 * Automatically activate subnetwork for new sites if setting is enabled.
+	 *
+	 * @since 1.3.0
+	 *
+	 * @param WP_Site $new_site The new site object.
+	 */
+	public function auto_activate_subnetwork( $new_site )
+	{
+		$options = get_option( 'supernetwork_consolidated', array() );
+
+		if ( !empty( $options['auto_activate'] ) )
+		{
+			if ( $this->wp_network->id === $new_site->network_id )
+			{
+				$blog = new Blog( $new_site );
+
+				if ( $blog->can_be_upgraded() )
+				{
+					$blog->upgrade_to_network( $this );
 				}
 			}
 		}

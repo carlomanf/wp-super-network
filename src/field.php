@@ -72,7 +72,7 @@ class Input_Field
 			$this )
 		);
 
-		$options = get_option( $setting );
+		$options = get_blog_option( get_main_site_id(), $setting );
 		$options = empty( $field ) ? array( '' => $options ) : $options;
 
 		if ( $type === 'select' && is_array( $labels ) )

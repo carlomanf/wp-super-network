@@ -495,11 +495,11 @@ class Network
 			$this->collisions[ $entity ] = $GLOBALS['wpdb']->get_col( 'SELECT `' . $id . '` FROM `' . $GLOBALS['wpdb']->__get( $entity ) . '` GROUP BY `' . $id . '` HAVING COUNT(*) > 1 ORDER BY `' . $id . '` ASC' );
 		}
 
-		$consolidated = !empty( get_option( 'supernetwork_consolidated', array() )['consolidated'] );
+		$consolidated = !empty( get_blog_option( $this->wp_network->site_id, 'supernetwork_consolidated', array() )['consolidated'] );
 
 		if ( $consolidated )
 		{
-			$this->post_types = array_keys( get_option( 'supernetwork_post_types', array() ) );
+			$this->post_types = array_keys( get_blog_option( $this->wp_network->site_id, 'supernetwork_post_types', array() ) );
 		}
 		else
 		{
@@ -797,11 +797,11 @@ class Network
 	 */
 	public function auto_activate_subnetwork( $new_site )
 	{
-		$options = get_option( 'supernetwork_consolidated', array() );
-
-		if ( !empty( $options['auto_activate'] ) )
+		if ( $this->wp_network->id === $new_site->network_id )
 		{
-			if ( $this->wp_network->id === $new_site->network_id )
+			$options = get_blog_option( $this->wp_network->site_id, 'supernetwork_consolidated', array() );
+
+			if ( !empty( $options['auto_activate'] ) )
 			{
 				$blog = new Blog( $new_site );
 

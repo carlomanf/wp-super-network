@@ -58,6 +58,14 @@ class WP_Super_Network
 	private $network;
 
 	/**
+	 * Current network ID.
+	 *
+	 * @since 1.3.0
+	 * @var int
+	 */
+	private $network_id;
+
+	/**
 	 * Instantiate a WP_Super_Network object.
 	 *
 	 * Don't call the constructor directly, use the `WP_Super_Network::get_instance()`
@@ -68,6 +76,7 @@ class WP_Super_Network
 		if ( function_exists( 'get_network' ) )
 		{
 			$this->network = new Network( get_network() );
+			$this->network_id = get_current_network_id();
 		}
 	}
 
@@ -82,61 +91,57 @@ class WP_Super_Network
 		return $this->network;
 	}
 
-	public static function options( $value, $option, $default )
+	public function options( $value, $option, $default )
 	{
-		if ( !is_main_site() )
+		if ( !is_main_site() && ( get_current_network_id() === $this->network_id || in_array( $option, array( 'supernetwork_consolidated', 'supernetwork_post_types', 'supernetwork_options' ), true ) ) )
 		{
 			$main = get_main_site_id();
 
 			if ( $main > 0 )
 			{
-				switch_to_blog( $main );
-				$new_value = get_option( $option, $default );
-				restore_current_blog();
-			}
-			else
-			{
+				$new_value = get_blog_option( $main, $option, $default );
+
 				if ( in_array( $option, array( 'supernetwork_consolidated', 'supernetwork_post_types', 'supernetwork_options' ), true ) )
 				{
-					$new_value = $default;
+					$value = array_merge( (array) $value, array_filter( (array) $new_value ) );
+				}
+				else
+				{
+					$value = $new_value;
+
+					if ( $new_value === false )
+					{
+						add_filter( 'option_' . $option, '__return_false' );
+					}
 				}
 			}
-
-			if ( isset( $new_value ) && $new_value === false )
-			{
-				add_filter( 'option_' . $option, '__return_false' );
-			}
 		}
 
-		return isset( $new_value ) ? $new_value : $value;
+		return $value;
 	}
 
-	public static function add_option( $option, $value )
+	public function add_option( $option, $value )
 	{
-		if ( !is_main_site() && has_filter( 'pre_option_' . $option, array( __CLASS__, 'options' ) ) )
+		if ( !is_main_site() && get_current_network_id() === $this->network_id && has_filter( 'pre_option_' . $option, array( $this, 'options' ) ) )
 		{
 			$main = get_main_site_id();
 
 			if ( $main > 0 && current_user_can_for_blog( $main, 'manage_options' ) )
 			{
-				switch_to_blog( $main );
-				add_option( $option, $value );
-				restore_current_blog();
+				add_blog_option( $main, $option, $value );
 			}
 		}
 	}
 
-	public static function update_option( $option, $old_value, $value )
+	public function update_option( $option, $old_value, $value )
 	{
-		if ( !is_main_site() && has_filter( 'pre_option_' . $option, array( __CLASS__, 'options' ) ) )
+		if ( !is_main_site() && get_current_network_id() === $this->network_id && has_filter( 'pre_option_' . $option, array( $this, 'options' ) ) )
 		{
 			$main = get_main_site_id();
 
 			if ( $main > 0 && current_user_can_for_blog( $main, 'manage_options' ) )
 			{
-				switch_to_blog( $main );
-				update_option( $option, $value );
-				restore_current_blog();
+				update_blog_option( $main, $option, $value );
 			}
 		}
 	}
@@ -149,20 +154,20 @@ class WP_Super_Network
 	public function run()
 	{
 		// Complete this before accessing the option on next line
-		add_filter( 'pre_option_supernetwork_options', array( __CLASS__, 'options' ), 10, 3 );
-		add_filter( 'pre_option_supernetwork_post_types', array( __CLASS__, 'options' ), 10, 3 );
-		add_filter( 'pre_option_supernetwork_consolidated', array( __CLASS__, 'options' ), 10, 3 );
+		add_filter( 'pre_option_supernetwork_options', array( $this, 'options' ), 10, 3 );
+		add_filter( 'pre_option_supernetwork_post_types', array( $this, 'options' ), 10, 3 );
+		add_filter( 'pre_option_supernetwork_consolidated', array( $this, 'options' ), 10, 3 );
 
-		foreach ( get_option( 'supernetwork_options', array() ) as $option => $val )
+		foreach ( get_blog_option( get_main_site_id(), 'supernetwork_options', array() ) as $option => $val )
 		{
 			if ( $val && strpos( $option, '_' ) !== 0 && strpos( $option, 'supernetwork_' ) !== 0 )
 			{
-				add_filter( 'pre_option_' . $option, array( __CLASS__, 'options' ), 10, 3 );
+				add_filter( 'pre_option_' . $option, array( $this, 'options' ), 10, 3 );
 			}
 		}
 
-		add_filter( 'add_option', array( __CLASS__, 'add_option' ), 10, 2 );
-		add_filter( 'update_option', array( __CLASS__, 'update_option' ), 10, 3 );
+		add_filter( 'add_option', array( $this, 'add_option' ), 10, 2 );
+		add_filter( 'update_option', array( $this, 'update_option' ), 10, 3 );
 
 		// Disable querying of meta ID. See issue #10
 		add_filter( 'update_comment_metadata_by_mid', '__return_false' );

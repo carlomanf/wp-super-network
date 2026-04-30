@@ -93,6 +93,26 @@ class WP_Super_Network
 
 	public function options( $value, $option, $default )
 	{
+		if ( $option === 'supernetwork_depth' )
+		{
+			$main_site_id = get_main_site_id();
+			$max_depth = is_main_site() || $main_site_id === 0 ? -2 : (int) get_blog_option( $main_site_id, 'supernetwork_depth', '-1' ) - 1;
+
+			if ( $max_depth < 0 )
+			{
+				$max_depth++;
+			}
+
+			if ( $value < 0 )
+			{
+				return $max_depth;
+			}
+			else
+			{
+				return $max_depth < 0 ? $value : min( $value, $max_depth );
+			}
+		}
+
 		if ( !is_main_site() && ( get_current_network_id() === $this->network_id || in_array( $option, array( 'supernetwork_consolidated', 'supernetwork_post_types', 'supernetwork_options' ), true ) ) )
 		{
 			$main = get_main_site_id();
@@ -180,11 +200,35 @@ class WP_Super_Network
 		// Register network.
 		add_action( 'plugins_loaded', array( $this->network, 'register' ) );
 
+		// Activate subnetworks if needed.
+		add_action( 'wp_initialize_site', array( $this, 'auto_activate_subnetwork' ) );
+
 		if ( !$this->network->consolidated )
 		{
 			add_filter( 'admin_init', array( $this, 'update_db' ) );
 			add_filter( 'page_row_actions', array( $this, 'republish' ), 10, 2 );
 			add_filter( 'post_row_actions', array( $this, 'republish' ), 10, 2 );
+		}
+	}
+
+	/**
+	 * Automatically activate subnetwork for new sites if setting is enabled.
+	 *
+	 * @since 1.3.0
+	 *
+	 * @param WP_Site $new_site The new site object.
+	 */
+	public function auto_activate_subnetwork( $new_site )
+	{
+		$main = get_main_site_id( $new_site->network_id );
+
+		if ( !empty( get_blog_option( $main, 'supernetwork_consolidated', array() )['auto_activate'] ) )
+		{
+			if ( (int) get_blog_option( $new_site->id, 'supernetwork_depth', '-1' ) !== 0 )
+			{
+				$blog = new Blog( $new_site );
+				$blog->upgrade_to_network();
+			}
 		}
 	}
 

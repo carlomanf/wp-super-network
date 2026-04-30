@@ -324,8 +324,7 @@ class Network
 			'',
 			'number',
 			'Subnetwork Depth Limit',
-			'Set the maximum depth of subnetworks that can be activated from this network.',
-			'Enter -1 for unlimited depth, or a positive number.'
+			'Set the maximum depth of subnetworks that can be activated from this network, -1 for unlimited.'
 		);
 
 		$field5 = new Input_Field(
@@ -473,7 +472,6 @@ class Network
 		add_filter( 'user_has_cap', array( $this, 'intercept_capability' ), 10, 4 );
 		add_filter( 'pre_handle_404', array( $this, 'singular_access' ), 10, 2 );
 		add_action( 'wp', array( $this, 'preview_access' ) );
-		add_action( 'wp_initialize_site', array( $this, 'auto_activate_subnetwork' ) );
 		add_filter( 'query', array( $this, 'intercept_query' ), 10, 2 );
 		add_filter( 'wp_insert_post', array( $this, 'shared_auto_increment' ), 10, 3 );
 		add_filter( 'wp_insert_comment', array( $this, 'auto_increment_comments' ), 10, 2 );
@@ -783,31 +781,6 @@ class Network
 				if ( !empty( $_POST['activate'][ (string) $blog->id ] ) && $blog->can_be_upgraded() )
 				{
 					$blog->upgrade_to_network();
-				}
-			}
-		}
-	}
-
-	/**
-	 * Automatically activate subnetwork for new sites if setting is enabled.
-	 *
-	 * @since 1.3.0
-	 *
-	 * @param WP_Site $new_site The new site object.
-	 */
-	public function auto_activate_subnetwork( $new_site )
-	{
-		if ( $this->wp_network->id === $new_site->network_id )
-		{
-			$options = get_blog_option( $this->wp_network->site_id, 'supernetwork_consolidated', array() );
-
-			if ( !empty( $options['auto_activate'] ) )
-			{
-				$blog = new Blog( $new_site );
-
-				if ( $blog->can_be_upgraded() )
-				{
-					$blog->upgrade_to_network( $this );
 				}
 			}
 		}

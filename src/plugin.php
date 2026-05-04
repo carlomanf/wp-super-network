@@ -91,79 +91,79 @@ class WP_Super_Network
 		return $this->network;
 	}
 
-	public function options( $value, $option, $default )
+	public function inherit_options( $value, $option )
 	{
+		$site = get_site();
+		$main = isset( $site ) ? get_main_site_id( $site->network_id ) : -1;
+		$inherit = $main > 0 && $main !== get_current_blog_id();
+
 		if ( $option === 'supernetwork_depth' )
 		{
-			$main_site_id = get_main_site_id();
-			$max_depth = is_main_site() || $main_site_id === 0 ? -2 : (int) get_blog_option( $main_site_id, 'supernetwork_depth', '-1' ) - 1;
+			$max_depth = $inherit ? (int) get_blog_option( $main, 'supernetwork_depth', '-1' ) - 1 : -2;
 
 			if ( $max_depth < 0 )
 			{
 				$max_depth++;
 			}
 
-			if ( $value < 0 )
+			if ( (int) $value < 0 )
 			{
-				return $max_depth;
+				return (string) $max_depth;
 			}
 			else
 			{
-				return $max_depth < 0 ? $value : min( $value, $max_depth );
+				return $max_depth < 0 ? $value : (string) min( (int) $value, $max_depth );
 			}
 		}
 
-		if ( !is_main_site() && ( get_current_network_id() === $this->network_id || in_array( $option, array( 'supernetwork_consolidated', 'supernetwork_post_types', 'supernetwork_options' ), true ) ) )
+		if ( $inherit )
 		{
-			$main = get_main_site_id();
-
-			if ( $main > 0 )
-			{
-				$new_value = get_blog_option( $main, $option, $default );
-
-				if ( in_array( $option, array( 'supernetwork_consolidated', 'supernetwork_post_types', 'supernetwork_options' ), true ) )
-				{
-					$value = array_merge( (array) $value, array_filter( (array) $new_value ) );
-				}
-				else
-				{
-					$value = $new_value;
-
-					if ( $new_value === false )
-					{
-						add_filter( 'option_' . $option, '__return_false' );
-					}
-				}
-			}
+			$value = array_merge( (array) $value, array_filter( (array) get_blog_option( $main, $option, array() ) ) );
 		}
 
 		return $value;
 	}
 
-	public function add_option( $option, $value )
+	public function options( $value, $option, $default = false )
 	{
-		if ( !is_main_site() && get_current_network_id() === $this->network_id && has_filter( 'pre_option_' . $option, array( $this, 'options' ) ) )
-		{
-			$main = get_main_site_id();
+		$site = get_site();
+		$main = isset( $site ) ? get_main_site_id( $site->network_id ) : -1;
 
-			if ( $main > 0 && current_user_can_for_blog( $main, 'manage_options' ) )
+		if ( $main > 0 && $main !== get_current_blog_id() && $site->network_id === $this->network_id )
+		{
+			$value = get_blog_option( $main, $option, $default );
+		}
+
+		return $value;
+	}
+
+	public function add_option( $option, $value, $update = false )
+	{
+		if ( has_filter( 'pre_option_' . $option, array( $this, 'options' ) ) || in_array( $option, array( 'supernetwork_consolidated', 'supernetwork_options', 'supernetwork_post_types' ), true ) )
+		{
+			$site = get_site();
+			$main = isset( $site ) ? get_main_site_id( $site->network_id ) : -1;
+
+			if ( $main > 0 && $main !== get_current_blog_id() && $site->network_id === $this->network_id )
 			{
-				add_blog_option( $main, $option, $value );
+				if ( current_user_can_for_blog( $main, 'manage_options' ) )
+				{
+					if ( $update )
+					{
+						update_blog_option( $main, $option, $value );
+					}
+					else
+					{
+						add_blog_option( $main, $option, $value );
+					}
+				}
 			}
 		}
 	}
 
 	public function update_option( $option, $old_value, $value )
 	{
-		if ( !is_main_site() && get_current_network_id() === $this->network_id && has_filter( 'pre_option_' . $option, array( $this, 'options' ) ) )
-		{
-			$main = get_main_site_id();
-
-			if ( $main > 0 && current_user_can_for_blog( $main, 'manage_options' ) )
-			{
-				update_blog_option( $main, $option, $value );
-			}
-		}
+		$this->add_option( $option, $value, true );
 	}
 
 	/**
@@ -173,16 +173,28 @@ class WP_Super_Network
 	 */
 	public function run()
 	{
-		// Complete this before accessing the option on next line
-		add_filter( 'pre_option_supernetwork_options', array( $this, 'options' ), 10, 3 );
-		add_filter( 'pre_option_supernetwork_post_types', array( $this, 'options' ), 10, 3 );
-		add_filter( 'pre_option_supernetwork_consolidated', array( $this, 'options' ), 10, 3 );
+		add_filter( 'option_supernetwork_options', array( $this, 'inherit_options' ), 10, 2 );
+		add_filter( 'option_supernetwork_post_types', array( $this, 'inherit_options' ), 10, 2 );
+		add_filter( 'option_supernetwork_consolidated', array( $this, 'inherit_options' ), 10, 2 );
+		add_filter( 'option_supernetwork_depth', array( $this, 'inherit_options' ), 10, 2 );
 
-		foreach ( get_blog_option( get_main_site_id(), 'supernetwork_options', array() ) as $option => $val )
+		add_filter( 'default_option_supernetwork_options', array( $this, 'inherit_options' ), 10, 2 );
+		add_filter( 'default_option_supernetwork_post_types', array( $this, 'inherit_options' ), 10, 2 );
+		add_filter( 'default_option_supernetwork_consolidated', array( $this, 'inherit_options' ), 10, 2 );
+		add_filter( 'default_option_supernetwork_depth', array( $this, 'inherit_options' ), 10, 2 );
+
+		$site = get_site();
+		$main = isset( $site ) ? get_main_site_id( $site->network_id ) : -1;
+		$main = $main > 0 ? $main : -1;
+
+		foreach ( get_blog_option( $main, 'supernetwork_options', array() ) as $option => $val )
 		{
 			if ( $val && strpos( $option, '_' ) !== 0 && strpos( $option, 'supernetwork_' ) !== 0 )
 			{
+				// All 3 filters are required in case `pre_option_{$option}` returns false.
 				add_filter( 'pre_option_' . $option, array( $this, 'options' ), 10, 3 );
+				add_filter( 'option_' . $option, array( $this, 'options' ), 10, 2 );
+				add_filter( 'default_option_' . $option, array( $this, 'options' ), 10, 2 );
 			}
 		}
 

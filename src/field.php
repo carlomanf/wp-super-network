@@ -72,7 +72,20 @@ class Input_Field
 			$this )
 		);
 
-		$options = get_blog_option( get_main_site_id(), $setting );
+		if ( 'supernetwork_depth' === $setting )
+		{
+			$id = get_current_blog_id();
+			$default = '-1';
+		}
+		else
+		{
+			$site = get_site();
+			$id = isset( $site ) ? get_main_site_id( $site->network_id ) : -1;
+			$id = $id > 0 ? $id : -1;
+			$default = array();
+		}
+
+		$options = get_blog_option( $id, $setting, $default );
 		$options = empty( $field ) ? array( '' => $options ) : $options;
 
 		if ( $type === 'select' && is_array( $labels ) )

@@ -256,7 +256,7 @@ class Network
 		$this->tools->add( $activate );
 
 		$this->settings = new Settings_Page(
-			array( 'supernetwork_options', 'supernetwork_post_types', 'supernetwork_consolidated', 'supernetwork_depth' ),
+			array( 'supernetwork_options', 'supernetwork_user_options', 'supernetwork_post_types', 'supernetwork_consolidated', 'supernetwork_depth' ),
 			'Network Settings',
 			'Network',
 			'manage_network_options',
@@ -289,7 +289,38 @@ class Network
 			$labels
 		);
 
+		$prefix = $wpdb->get_blog_prefix();
+		$user_results = $wpdb->get_results( "SELECT DISTINCT `meta_key` FROM $wpdb->usermeta WHERE `meta_key` LIKE '" . $wpdb->esc_like( $prefix ) . "%' ORDER BY `meta_key`" );
+		$user_labels = array();
+
+		foreach ( $user_results as $result )
+		{
+			if ( 0 === strpos( $result->meta_key, $prefix ) )
+			{
+				$key = substr( $result->meta_key, strlen( $prefix ) );
+
+				if ( $prefix !== $wpdb->base_prefix || !preg_match( '/^([2-9]|[1-9]\d+)_/', $key ) )
+				{
+					$user_labels[ $key ] = $key;
+				}
+			}
+		}
+
 		$section2 = new Input_Section(
+			'user_options',
+			'User Options',
+			'This setting only takes effect when consolidated mode is turned on.'
+		);
+
+		$field2 = new Input_Field(
+			'supernetwork_user_options',
+			'%s',
+			'checkbox',
+			'Defer to Network',
+			$user_labels
+		);
+
+		$section3 = new Input_Section(
 			'post_types',
 			'Post Types',
 			'This setting only takes effect when consolidated mode is turned on.'
@@ -297,7 +328,7 @@ class Network
 
 		add_filter( 'supernetwork_settings_field_args', array( $this, 'post_types' ), 10, 2 );
 
-		$field2 = new Input_Field(
+		$field3 = new Input_Field(
 			'supernetwork_post_types',
 			'%s',
 			'checkbox',
@@ -305,12 +336,12 @@ class Network
 			array()
 		);
 
-		$section3 = new Input_Section(
+		$section4 = new Input_Section(
 			'general',
 			'General Settings'
 		);
 
-		$field3 = new Input_Field(
+		$field4 = new Input_Field(
 			'supernetwork_consolidated',
 			'consolidated',
 			'checkbox',
@@ -319,7 +350,7 @@ class Network
 			'<strong>Warning:</strong> Consolidated mode is recommended for fresh networks. If you have pre-existing data (e.g. posts and pages) on your network, some of it may not be compatible with consolidated mode.'
 		);
 
-		$field4 = new Input_Field(
+		$field5 = new Input_Field(
 			'supernetwork_depth',
 			'',
 			'number',
@@ -327,7 +358,7 @@ class Network
 			'Set the maximum depth of subnetworks that can be activated from this network, -1 for unlimited.'
 		);
 
-		$field5 = new Input_Field(
+		$field6 = new Input_Field(
 			'supernetwork_consolidated',
 			'auto_activate',
 			'checkbox',
@@ -338,11 +369,13 @@ class Network
 		$section->add( $field );
 		$section2->add( $field2 );
 		$section3->add( $field3 );
-		$section3->add( $field4 );
-		$section3->add( $field5 );
+		$section4->add( $field4 );
+		$section4->add( $field5 );
+		$section4->add( $field6 );
+		$this->settings->add( $section4 );
 		$this->settings->add( $section3 );
-		$this->settings->add( $section2 );
 		$this->settings->add( $section );
+		$this->settings->add( $section2 );
 	}
 
 	public function add_new_post( $hook_suffix )

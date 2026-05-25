@@ -139,7 +139,7 @@ class WP_Super_Network
 
 	public function add_option( $option, $value, $update = false )
 	{
-		if ( has_filter( 'pre_option_' . $option, array( $this, 'options' ) ) || in_array( $option, array( 'supernetwork_consolidated', 'supernetwork_options', 'supernetwork_post_types' ), true ) )
+		if ( has_filter( 'pre_option_' . $option, array( $this, 'options' ) ) || in_array( $option, array( 'supernetwork_consolidated', 'supernetwork_options', 'supernetwork_user_options', 'supernetwork_post_types' ), true ) )
 		{
 			$site = get_site();
 			$main = isset( $site ) ? get_main_site_id( $site->network_id ) : -1;
@@ -166,6 +166,55 @@ class WP_Super_Network
 		$this->add_option( $option, $value, true );
 	}
 
+	public function user_option( $value, $option, $user )
+	{
+		$site = get_site();
+		$main = isset( $site ) ? get_main_site_id( $site->network_id ) : -1;
+
+		if ( $main > 0 && $main !== get_current_blog_id() && $site->network_id === $this->network_id )
+		{
+			$prefix = $GLOBALS['wpdb']->get_blog_prefix( $main );
+
+			if ( $user->has_prop( $prefix . $option ) )
+			{
+				$value = $user->get( $prefix . $option );
+			}
+			else
+			{
+				if ( $user->has_prop( $GLOBALS['wpdb']->get_blog_prefix() . $option ) )
+				{
+					$value = $user->has_prop( $option ) ? $user->get( $option ) : false;
+				}
+			}
+		}
+
+		return $value;
+	}
+
+	public function update_user_metadata( $check, $user_id, $meta_key, $meta_value, $prev_value )
+	{
+		$prefix = $GLOBALS['wpdb']->get_blog_prefix();
+
+		if ( 0 === strpos( $meta_key, $prefix ) )
+		{
+			$option = substr( $meta_key, strlen( $prefix ) );
+
+			// Check if this option is configured for network inheritance
+			if ( has_filter( 'get_user_option_' . $option, array( $this, 'user_option' ) ) )
+			{
+				$site = get_site();
+				$main = isset( $site ) ? get_main_site_id( $site->network_id ) : -1;
+
+				if ( $main > 0 && $main !== get_current_blog_id() && $site->network_id === $this->network_id )
+				{
+					return update_user_meta( $user_id, $GLOBALS['wpdb']->get_blog_prefix( $main ) . $option, $meta_value, $prev_value );
+				}
+			}
+		}
+
+		return $check;
+	}
+
 	/**
 	 * Launch the initialization process.
 	 *
@@ -174,11 +223,13 @@ class WP_Super_Network
 	public function run()
 	{
 		add_filter( 'option_supernetwork_options', array( $this, 'inherit_options' ), 10, 2 );
+		add_filter( 'option_supernetwork_user_options', array( $this, 'inherit_options' ), 10, 2 );
 		add_filter( 'option_supernetwork_post_types', array( $this, 'inherit_options' ), 10, 2 );
 		add_filter( 'option_supernetwork_consolidated', array( $this, 'inherit_options' ), 10, 2 );
 		add_filter( 'option_supernetwork_depth', array( $this, 'inherit_options' ), 10, 2 );
 
 		add_filter( 'default_option_supernetwork_options', array( $this, 'inherit_options' ), 10, 2 );
+		add_filter( 'default_option_supernetwork_user_options', array( $this, 'inherit_options' ), 10, 2 );
 		add_filter( 'default_option_supernetwork_post_types', array( $this, 'inherit_options' ), 10, 2 );
 		add_filter( 'default_option_supernetwork_consolidated', array( $this, 'inherit_options' ), 10, 2 );
 		add_filter( 'default_option_supernetwork_depth', array( $this, 'inherit_options' ), 10, 2 );
@@ -200,6 +251,13 @@ class WP_Super_Network
 
 		add_filter( 'add_option', array( $this, 'add_option' ), 10, 2 );
 		add_filter( 'update_option', array( $this, 'update_option' ), 10, 3 );
+
+		foreach ( array_filter( get_blog_option( $main, 'supernetwork_user_options', array() ) ) as $option => $val )
+		{
+			add_filter( 'get_user_option_' . $option, array( $this, 'user_option' ), 10, 3 );
+		}
+
+		add_filter( 'update_user_metadata', array( $this, 'update_user_metadata' ), 10, 5 );
 
 		// Disable querying of meta ID. See issue #10
 		add_filter( 'update_comment_metadata_by_mid', '__return_false' );

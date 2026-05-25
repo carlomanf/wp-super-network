@@ -61,6 +61,39 @@ if ( ! defined( 'MULTISITE' ) || ! MULTISITE )
 }
 
 /**
+ * Polyfill for `user_can_for_site` introduced in version 6.7.
+ */
+if ( !function_exists( 'user_can_for_site' ) )
+{
+	function user_can_for_site( $user, $site_id, $capability, ...$args ) {
+		if ( ! is_object( $user ) ) {
+			$user = get_userdata( $user );
+		}
+
+		if ( empty( $user ) ) {
+			// User is logged out, create anonymous user object.
+			$user = new WP_User( 0 );
+			$user->init( new stdClass() );
+		}
+
+		// Check if the blog ID is valid.
+		if ( ! is_numeric( $site_id ) || $site_id <= 0 ) {
+			return false;
+		}
+
+		$switched = is_multisite() ? switch_to_blog( $site_id ) : false;
+
+		$can = user_can( $user->ID, $capability, ...$args );
+
+		if ( $switched ) {
+			restore_current_blog();
+		}
+
+		return $can;
+	}
+}
+
+/**
  * Load plugin initialisation file.
  */
 require plugin_dir_path( __FILE__ ) . '/init.php';

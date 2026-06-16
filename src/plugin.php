@@ -236,9 +236,8 @@ class WP_Super_Network
 
 		$site = get_site();
 		$main = isset( $site ) ? get_main_site_id( $site->network_id ) : -1;
-		$main = $main > 0 ? $main : -1;
 
-		foreach ( get_blog_option( $main, 'supernetwork_options', array() ) as $option => $val )
+		foreach ( $main > 0 ? get_blog_option( $main, 'supernetwork_options', array() ) : array() as $option => $val )
 		{
 			if ( $val && strpos( $option, '_' ) !== 0 && strpos( $option, 'supernetwork_' ) !== 0 )
 			{
@@ -252,7 +251,7 @@ class WP_Super_Network
 		add_filter( 'add_option', array( $this, 'add_option' ), 10, 2 );
 		add_filter( 'update_option', array( $this, 'update_option' ), 10, 3 );
 
-		foreach ( array_filter( get_blog_option( $main, 'supernetwork_user_options', array() ) ) as $option => $val )
+		foreach ( $main > 0 ? array_filter( get_blog_option( $main, 'supernetwork_user_options', array() ) ) : array() as $option => $val )
 		{
 			add_filter( 'get_user_option_' . $option, array( $this, 'user_option' ), 10, 3 );
 		}
@@ -292,7 +291,7 @@ class WP_Super_Network
 	{
 		$main = get_main_site_id( $new_site->network_id );
 
-		if ( !empty( get_blog_option( $main, 'supernetwork_consolidated', array() )['auto_activate'] ) )
+		if ( $main > 0 && !empty( get_blog_option( $main, 'supernetwork_consolidated', array() )['auto_activate'] ) )
 		{
 			if ( (int) get_blog_option( $new_site->id, 'supernetwork_depth', '-1' ) !== 0 )
 			{

@@ -81,11 +81,10 @@ class Input_Field
 		{
 			$site = get_site();
 			$id = isset( $site ) ? get_main_site_id( $site->network_id ) : -1;
-			$id = $id > 0 ? $id : -1;
 			$default = array();
 		}
 
-		$options = get_blog_option( $id, $setting, $default );
+		$options = $id > 0 ? get_blog_option( $id, $setting, $default ) : $default;
 		$options = empty( $field ) ? array( '' => $options ) : $options;
 
 		if ( $type === 'select' && is_array( $labels ) )

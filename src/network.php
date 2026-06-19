@@ -235,9 +235,9 @@ class Network
 
 		$main = new Input_Section(
 			'main',
-			$this->consolidated ? 'ID Collisions' : 'Republished Posts and Pages',
+			'Republished Posts and Pages',
 			'',
-			array( $this, $this->consolidated ? 'page' : 'republished' )
+			array( $this, 'page' )
 		);
 
 		$activate = new Input_Section(
@@ -630,6 +630,18 @@ class Network
 
 	public function page()
 	{
+		if ( $this->consolidated )
+		{
+			$this->collisions();
+		}
+		else
+		{
+			$this->republished();
+		}
+	}
+
+	private function collisions()
+	{
 		$entity = $this->get_entity_by_median_score();
 
 		$this->consolidated = false;
@@ -797,7 +809,7 @@ class Network
 	 *
 	 * @since 1.0.4
 	 */
-	public function republished()
+	private function republished()
 	{
 		$republished = $this->consolidate( 'posts_per_page=-1&meta_key=_supernetwork_share&post_type=any&post_status=any' );
 

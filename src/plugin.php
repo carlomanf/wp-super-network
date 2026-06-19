@@ -272,12 +272,10 @@ class WP_Super_Network
 		// Activate subnetworks if needed.
 		add_action( 'wp_initialize_site', array( $this, 'auto_activate_subnetwork' ) );
 
-		if ( !$this->network->consolidated )
-		{
-			add_filter( 'admin_init', array( $this, 'update_db' ) );
-			add_filter( 'page_row_actions', array( $this, 'republish' ), 10, 2 );
-			add_filter( 'post_row_actions', array( $this, 'republish' ), 10, 2 );
-		}
+		// Republish posts and pages.
+		add_filter( 'admin_init', array( $this, 'update_db' ) );
+		add_filter( 'page_row_actions', array( $this, 'republish' ), 10, 2 );
+		add_filter( 'post_row_actions', array( $this, 'republish' ), 10, 2 );
 	}
 
 	/**
@@ -308,6 +306,9 @@ class WP_Super_Network
 	 */
 	public function update_db()
 	{
+		if ( $this->network->consolidated )
+			return;
+
 		if ( empty( $_GET['republish'] ) )
 			return;
 
@@ -329,30 +330,33 @@ class WP_Super_Network
 	 */
 	public function republish( $actions, $post )
 	{
-		$link = 'post' == $post->post_type ? admin_url( 'edit.php?republish=' . $post->ID ) : admin_url( 'edit.php?post_type=' . $post->post_type . '&republish=' . $post->ID );
-
-		if ( in_array( (string) $post->ID, $this->network->republished, true ) )
+		if ( !$this->network->consolidated )
 		{
-			$actions['republish'] = '<b style="color: #555;">' . __( 'Republished', 'supernetwork' ) . '</b>';
+			$link = 'post' == $post->post_type ? admin_url( 'edit.php?republish=' . $post->ID ) : admin_url( 'edit.php?post_type=' . $post->post_type . '&republish=' . $post->ID );
 
-			if ( current_user_can( 'edit_post', $post->ID ) )
+			if ( in_array( (string) $post->ID, $this->network->republished, true ) )
 			{
-				$actions['republish'] .= ' <a href="' . $link . '&revoke=1">(' . __( 'Revoke?', 'supernetwork' ) . ')</a>';
-			}
-		}
-		else
-		{
-			if ( current_user_can( 'edit_post', $post->ID ) )
-			{
-				$collisions = $this->network->collisions;
+				$actions['republish'] = '<b style="color: #555;">' . __( 'Republished', 'supernetwork' ) . '</b>';
 
-				if ( array_intersect( get_comments( 'fields=ids&post_id=' . $post->ID ), $collisions['comments'] ) !== array() || in_array( (string) $post->ID, $collisions['posts'], true ) || array_intersect( wp_get_object_terms( $post->ID, array_keys( $GLOBALS['wp_taxonomies'] ), 'fields=tt_ids' ), $collisions['term_taxonomy'] ) !== array() || array_intersect( wp_get_object_terms( $post->ID, array_keys( $GLOBALS['wp_taxonomies'] ), 'fields=ids' ), $collisions['terms'] ) !== array() )
+				if ( current_user_can( 'edit_post', $post->ID ) )
 				{
-					$actions['republish'] = '<i style="color: #888;">' . __( 'Can&apos;t Republish', 'supernetwork' ) . '</i>';
+					$actions['republish'] .= ' <a href="' . $link . '&revoke=1">(' . __( 'Revoke?', 'supernetwork' ) . ')</a>';
 				}
-				else
+			}
+			else
+			{
+				if ( current_user_can( 'edit_post', $post->ID ) )
 				{
-					$actions['republish'] = '<a href="' . $link . '">' . __( 'Republish', 'supernetwork' ) . '</a>';
+					$collisions = $this->network->collisions;
+
+					if ( array_intersect( get_comments( 'fields=ids&post_id=' . $post->ID ), $collisions['comments'] ) !== array() || in_array( (string) $post->ID, $collisions['posts'], true ) || array_intersect( wp_get_object_terms( $post->ID, array_keys( $GLOBALS['wp_taxonomies'] ), 'fields=tt_ids' ), $collisions['term_taxonomy'] ) !== array() || array_intersect( wp_get_object_terms( $post->ID, array_keys( $GLOBALS['wp_taxonomies'] ), 'fields=ids' ), $collisions['terms'] ) !== array() )
+					{
+						$actions['republish'] = '<i style="color: #888;">' . __( 'Can&apos;t Republish', 'supernetwork' ) . '</i>';
+					}
+					else
+					{
+						$actions['republish'] = '<a href="' . $link . '">' . __( 'Republish', 'supernetwork' ) . '</a>';
+					}
 				}
 			}
 		}

@@ -91,6 +91,18 @@ class Interceptor
 		return get_preview_post_link( $post, array_intersect_key( $query_args, array( 'preview_nonce' => null, 'preview_id' => null ) ) );
 	}
 
+	public function intercept_term_link( $termlink, $term, $taxonomy )
+	{
+		if ( !is_null( $blog = $this->network->get_blog( $term->term_id, 'terms' ) ) )
+		{
+			switch_to_blog( $blog->id );
+			$termlink = get_term_link( $term, $taxonomy );
+			restore_current_blog();
+		}
+
+		return $termlink;
+	}
+
 	public function intercept_attachment_url( $url, $attachment_id )
 	{
 		if ( !is_null( $blog = $this->network->get_blog( $attachment_id ) ) )
@@ -151,7 +163,7 @@ class Interceptor
 
 		if ( in_array( $args[0], array( 'add_term_meta', 'assign_term', 'edit_term', 'edit_term_meta', 'delete_term', 'delete_term_meta' ), true ) )
 		{
-			$blog = $this->network->get_blog( get_term( $args[2] )->ID, 'terms' );
+			$blog = $this->network->get_blog( get_term( $args[2] )->term_id, 'terms' );
 		}
 
 		if ( in_array( $args[0], array( 'add_comment_meta', 'delete_comment_meta', 'edit_comment', 'edit_comment_meta' ), true ) )
@@ -179,6 +191,7 @@ class Interceptor
 		add_filter( 'page_link', array( $this, 'intercept_permalink' ), 10, 2 );
 		add_filter( 'preview_post_link', array( $this, 'intercept_preview_link' ), 10, 2 );
 		add_filter( 'supernetwork_preview_link', array( $this, 'replace_preview_link' ), 10, 2 );
+		add_filter( 'term_link', array( $this, 'intercept_term_link' ), 10, 3 );
 		add_filter( 'wp_get_attachment_url', array( $this, 'intercept_attachment_url' ), 10, 2 );
 		add_filter( 'get_attached_file', array( $this, 'intercept_attached_file' ), 10, 2 );
 		add_filter( 'wp_calculate_image_srcset_meta', array( $this, 'intercept_srcset_meta' ), 10, 4 );

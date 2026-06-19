@@ -1,10 +1,10 @@
 <?php
 /**
- * Permalink Transformer class.
+ * Interceptor class.
  */
 namespace WP_Super_Network;
 
-class Permalink_Transformer
+class Interceptor
 {
 	/**
 	 * Network instance.
@@ -37,7 +37,8 @@ class Permalink_Transformer
 	 */
 	public function intercept_permalink( $permalink, $post_ID )
 	{
-		if ( !doing_filter( 'supernetwork_preview_link' ) && !is_null( $blog = $this->network->get_blog( $post_ID ) ) ) {
+		if ( !doing_filter( 'supernetwork_preview_link' ) && !is_null( $blog = $this->network->get_blog( $post_ID ) ) )
+		{
 			switch_to_blog( $blog->id );
 			$permalink = get_permalink( $post_ID );
 			restore_current_blog();

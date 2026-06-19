@@ -92,12 +92,12 @@ class Network
 	private $meta_ids = array();
 
 	/**
-	 * Permalink Transformer instance.
+	 * Interceptor instance.
 	 *
 	 * @since 1.3.0
-	 * @var Permalink_Transformer
+	 * @var Interceptor
 	 */
-	private $permalink_transformer;
+	private $interceptor;
 
 	public function shared_auto_increment( $post_ID, $post, $update )
 	{
@@ -385,7 +385,7 @@ class Network
 		$this->settings->add( $section );
 		$this->settings->add( $section2 );
 
-		$this->permalink_transformer = new Permalink_Transformer( $this );
+		$this->interceptor = new Interceptor( $this );
 	}
 
 	public function add_new_post( $hook_suffix )
@@ -507,7 +507,7 @@ class Network
 		$this->settings->register();
 		$this->tools->register();
 
-		$this->permalink_transformer->register_filters();
+		$this->interceptor->register_filters();
 
 		add_filter( 'pre_handle_404', array( $this, 'singular_access' ), 10, 2 );
 		add_action( 'wp', array( $this, 'preview_access' ) );

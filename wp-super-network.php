@@ -3,7 +3,7 @@
  * Plugin Name: WP Super Network
  * Plugin URI:
  * Description: Share content between sites and create offspring networks.
- * Version: 1.3.0-beta2
+ * Version: 1.3.0-RC1
  * Requires at least: 6.1
  * Requires PHP: 7.2
  * Author: Ask Carlo

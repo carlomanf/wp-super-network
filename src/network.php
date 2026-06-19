@@ -509,7 +509,6 @@ class Network
 
 		$this->permalink_transformer->register_filters();
 
-		add_filter( 'user_has_cap', array( $this, 'intercept_capability' ), 10, 4 );
 		add_filter( 'pre_handle_404', array( $this, 'singular_access' ), 10, 2 );
 		add_action( 'wp', array( $this, 'preview_access' ) );
 		add_filter( 'query', array( $this, 'intercept_query' ), 10, 2 );
@@ -858,19 +857,6 @@ class Network
 			wp_cache_set( 'supernetwork_queries', $transformed, $query );
 			return $transformed->transformed;
 		}
-	}
-
-	public function intercept_capability( $allcaps, $caps, $args, $user )
-	{
-		if ( in_array( $args[0], array( 'delete_post', 'edit_post', 'publish_post', 'read_post' ), true ) )
-		{
-			if ( !is_null( $blog = $this->get_blog( get_post( $args[2] )->ID ) ) )
-			{
-				return ( new \WP_User( $user, '', $blog->id ) )->allcaps;
-			}
-		}
-
-		return $allcaps;
 	}
 
 	public function singular_access( $false, $wp_query )

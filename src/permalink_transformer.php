@@ -90,6 +90,38 @@ class Permalink_Transformer
         return get_preview_post_link( $post, array_intersect_key( $query_args, array( 'preview_nonce' => null, 'preview_id' => null ) ) );
     }
 
+	public function intercept_capability( $allcaps, $caps, $args, $user )
+	{
+		$blog = null;
+
+		if ( in_array( $args[0], array( 'add_post_meta', 'delete_post', 'delete_post_meta', 'edit_post', 'edit_post_meta', 'publish_post', 'read_post' ), true ) )
+		{
+			$blog = $this->network->get_blog( get_post( $args[2] )->ID );
+		}
+
+		if ( $args[0] === 'edit_block_binding' && isset( $args[2]->post ) )
+		{
+			$blog = $this->network->get_blog( (int) $args[2]->post->ID );
+		}
+
+		if ( in_array( $args[0], array( 'add_term_meta', 'assign_term', 'edit_term', 'edit_term_meta', 'delete_term', 'delete_term_meta' ), true ) )
+		{
+			$blog = $this->network->get_blog( get_term( $args[2] )->ID, 'terms' );
+		}
+
+		if ( in_array( $args[0], array( 'add_comment_meta', 'delete_comment_meta', 'edit_comment', 'edit_comment_meta' ), true ) )
+		{
+			$blog = $this->network->get_blog( (int) get_comment( $args[2] )->comment_ID, 'comments' );
+		}
+
+		if ( isset( $blog ) )
+		{
+			return ( new \WP_User( $user, '', $blog->id ) )->allcaps;
+		}
+
+		return $allcaps;
+	}
+
     /**
      * Register all add_filter calls.
      *
@@ -102,5 +134,6 @@ class Permalink_Transformer
         add_filter( 'page_link', array( $this, 'intercept_permalink' ), 10, 2 );
         add_filter( 'preview_post_link', array( $this, 'intercept_preview_link' ), 10, 2 );
         add_filter( 'supernetwork_preview_link', array( $this, 'replace_preview_link' ), 10, 2 );
+		add_filter( 'user_has_cap', array( $this, 'intercept_capability' ), 10, 4 );
     }
 }

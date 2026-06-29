@@ -239,7 +239,7 @@ class WP_Super_Network
 
 		foreach ( $main > 0 ? get_blog_option( $main, 'supernetwork_options', array() ) : array() as $option => $val )
 		{
-			if ( $val && strpos( $option, '_' ) !== 0 && strpos( $option, 'supernetwork_' ) !== 0 )
+			if ( $val && strpos( $option, '_' ) !== 0 && strpos( $option, 'supernetwork_' ) !== 0 && substr( $option, -10 ) !== 'user_roles' )
 			{
 				// All 3 filters are required in case `pre_option_{$option}` returns false.
 				add_filter( 'pre_option_' . $option, array( $this, 'options' ), 10, 3 );

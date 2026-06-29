@@ -281,7 +281,7 @@ class Network
 		);
 
 		global $wpdb;
-		$results = $wpdb->get_results( "SELECT DISTINCT `option_name` FROM $wpdb->options WHERE `option_name` NOT LIKE '\_%' AND `option_name` NOT LIKE 'supernetwork\_%' ORDER BY `option_name`" );
+		$results = $wpdb->get_results( "SELECT DISTINCT `option_name` FROM $wpdb->options WHERE `option_name` NOT LIKE '\_%' AND `option_name` NOT LIKE 'supernetwork\_%' AND `option_name` NOT LIKE '%user\_roles' ORDER BY `option_name`" );
 		$labels = array();
 
 		foreach ( $results as $result )

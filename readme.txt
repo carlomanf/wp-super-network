@@ -1,8 +1,8 @@
 === WP Super Network ===
 Contributors: manfcarlo
 Tags: network, multisite, share, sharing, move, migrate, migration, duplicate, syndication, content, management
-Tested up to: 6.1
-Stable tag: 1.2.0
+Tested up to: 7.0
+Stable tag: 1.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -12,7 +12,7 @@ Share content between sites and create offspring networks.
 
 WP Super Network is a plugin that super-charges your WordPress multisite network!
 
-This plugin will enhance WordPress multisite functionality in three core ways:
+This plugin enhances WordPress multisite functionality in three core ways:
 
 1. Enable posts and pages to be instantly republished across different sites in a network
 1. Enable an existing site on a network to be used as the main site for a new WordPress network
@@ -29,9 +29,9 @@ This section describes how to install the plugin and get it working.
 
 == How to Use This Plugin ==
 
-After installation, you will find a new Super Network screen in the WordPress network admin. Note that only super admins of the network have access to the network admin. Also note that this plugin will deactivate itself unless multisite is already active. If you have not yet set up multisite, you can follow the [instructions here.](https://wordpress.org/support/article/create-a-network/)
+After installation, you will find a new Network Tools screen in the WordPress network admin. Note that only super admins of the network have access to the network admin. Also note that this plugin will deactivate itself unless multisite is already active. If you have not yet set up multisite, you can follow the [instructions here.](https://wordpress.org/support/article/create-a-network/)
 
-In the Super Network screen, you can see a list of all posts and pages across the network that were flagged to be republished (shared) across the whole network. You can also see a list of all sites on the network that they can be republished to.
+In the Network Tools screen, you can see a list of all posts and pages across the network that were flagged to be republished (shared) across the whole network. You can also see a list of all sites on the network that they can be republished to.
 
 To flag posts and pages for republication, access the Posts or Pages screen in WordPress, find the one you want to republish, and click on Republish below the post title. If you want to revoke the republication, just click on Revoke in the same place.
 
@@ -41,7 +41,7 @@ To flag posts and pages for republication, access the Posts or Pages screen in W
 
 Flag any post or page on a main site for republication by finding it on the Posts or Pages screen and clicking Republish.
 
-After you have republished the post or page, it will start showing up across every site on your network. You can also access the network admin and click on Super Network. You will see a list of all posts and pages across all sites in the network that have been flagged for republication.
+After you have republished the post or page, it will start showing up across every site on your network. You can also access the network admin and click on Network Tools. You will see a list of all posts and pages across all sites in the network that have been flagged for republication.
 
 To revoke republication, just click on Revoke in the same place where you republished the post or page.
 
@@ -51,7 +51,7 @@ If two or more sites on a network have a post with the same numeric ID, none of 
 
 = How do I turn an existing site into the main site for a new network? =
 
-This feature is scheduled for the next major release.
+Access the network admin screen and click on Network Tools. In the Activate Subnetworks section, select all the sites to create subnetworks around and submit your selection. A new subnetwork will be created for each site.
 
 = How do I manage all of my sites in a single admin area? =
 
@@ -59,7 +59,7 @@ Go to Settings > Network and turn on consolidated mode. Effectively, this republ
 
 = After turning on consolidated mode, why do some of my posts and pages disappear? =
 
-If two or more sites on a network have a post with the same numeric ID, none of these posts is able to be accessed on consolidated mode. You can eliminate post ID collisions by deleting posts you don't want via the network admin screen > Super Network.
+If two or more sites on a network have a post with the same numeric ID, none of these posts is able to be accessed on consolidated mode. You can eliminate post ID collisions by deleting posts you don't want via the network admin screen > Network Tools.
 
 = Is this the same as Global Terms? =
 
@@ -93,13 +93,17 @@ Although WP Super Network requires multisite, it does not require you to learn a
 
 WP Super Network is incompatible with [Link Manager](https://wordpress.org/plugins/link-manager/). Users of Link Manager will not be supported and are advised to not install WP Super Network.
 
-WP Super Network is currently incompatible with [SQLite Database Integration](https://wordpress.org/plugins/sqlite-database-integration/). Users of SQLite Database Integration are advised to not install WP Super Network for the time being. Compatibility is planned for a later release, so check back later.
+WP Super Network is currently incompatible with [SQLite Database Integration](https://wordpress.org/plugins/sqlite-database-integration/), which is activated internally by WordPress Playground. Users of SQLite Database Integration and/or WordPress Playground are advised to not install WP Super Network for the time being. Compatibility is planned for a later release, so check back later.
 
 If you use a plugin that adds a db.php drop-in, it may or may not be incompatible with WP Super Network. To know if you have a db.php drop-in, go to the Plugins screen, click on Drop-in and check if db.php is listed. If the db.php drop-in was added by a plugin that follows the WordPress conventions well and has high user ratings, you are unlikely to see any incompatibility issues with WP Super Network, but you are welcome to ask on the support forum.
 
 = Is WP Super Network safe to install? =
 
 See above question about incompatible plugins.
+
+= Does WP Super Network work on WordPress Playground? =
+
+Not at the moment. For details, see above question about incompatible plugins.
 
 For best results, the free version of WP Super Network should be activated on a fresh network. While results will vary, you may find that some features (e.g. consolidated mode) are limited in utility for existing networks and/or cause a slow-down in performance for large networks.
 
@@ -112,6 +116,17 @@ A premium version is planned for the future, focusing on enhanced performance fo
 Through the WordPress support forum, or on the [GitHub page here.](https://github.com/carlomanf/wp-super-network/issues)
 
 == Changelog ==
+
+= 1.3.0 =
+* Activate subnetworks (#2 and #21)
+* Load blogs from supernetworks and subnetworks (#22)
+* Inherit options from supernetworks (#24)
+* Network-based user options (#4)
+* Enhanced permalinks and capability checks (#18) 
+* Improve handling of joins (#19)
+* Support for PHP 8.0
+* Minimum core version lifted to 6.1
+* Various other bug fixes
 
 = 1.2.0 =
 * Republished posts and pages can be inserted, updated and deleted

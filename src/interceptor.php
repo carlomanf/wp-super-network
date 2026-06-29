@@ -147,6 +147,33 @@ class Interceptor
 		return $sources;
 	}
 
+	public function intercept_upload_dir( $upload_dir )
+	{
+		$blog_id = in_array( 'attachment', $this->network->post_types, true ) ? get_main_site_id() : 0;
+
+		foreach ( array( 'file' => 'post', 'async-upload' => 'post_id' ) as $file => $var )
+		{
+			if ( isset( $_FILES[ $file ] ) && isset( $_REQUEST[ $var ] ) )
+			{
+				break;
+			}
+		}
+
+		if ( $blog_id === 0 && isset( $_FILES[ $file ] ) && isset( $_REQUEST[ $var ] ) && !is_null( $blog = $this->network->get_blog( (int) $_REQUEST[ $var ] ) ) )
+		{
+			$blog_id = $blog->id;
+		}
+
+		if ( $blog_id > 0 && $blog_id !== get_current_blog_id() )
+		{
+			switch_to_blog( $blog_id );
+			$upload_dir = wp_upload_dir();
+			restore_current_blog();
+		}
+
+		return $upload_dir;
+	}
+
 	public function intercept_capability( $allcaps, $caps, $args, $user )
 	{
 		$blog = null;
@@ -196,6 +223,7 @@ class Interceptor
 		add_filter( 'get_attached_file', array( $this, 'intercept_attached_file' ), 10, 2 );
 		add_filter( 'wp_calculate_image_srcset_meta', array( $this, 'intercept_srcset_meta' ), 10, 4 );
 		add_filter( 'wp_calculate_image_srcset', array( $this, 'intercept_srcset' ), 10, 5 );
+		add_filter( 'upload_dir', array( $this, 'intercept_upload_dir' ) );
 		add_filter( 'user_has_cap', array( $this, 'intercept_capability' ), 10, 4 );
 	}
 }

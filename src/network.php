@@ -498,12 +498,6 @@ class Network
 			$supernetwork = $supernetwork->supernetwork;
 		}
 
-		// Populate $subnetworks: store blog IDs that are networks
-		foreach ( $this->blogs as $blog )
-		{
-			$this->set_subnetwork_blogs( $blog, $this );
-		}
-
 		$this->settings->register();
 		$this->tools->register();
 
@@ -521,6 +515,16 @@ class Network
 		add_filter( 'delete_comment_meta', array( $this, 'delete_meta' ), 10, 2 );
 		add_filter( 'delete_post_meta', array( $this, 'delete_meta' ), 10, 2 );
 		add_filter( 'delete_term_meta', array( $this, 'delete_meta' ), 10, 2 );
+		add_action( 'set_current_user', array( $this, 'load' ) );
+	}
+
+	public function load()
+	{
+		// Populate $subnetworks: store blog IDs that are networks
+		foreach ( $this->blogs as $blog )
+		{
+			$this->set_subnetwork_blogs( $blog, $this );
+		}
 
 		// Comments must be queried before posts so as not to mask any comment ID collisions.
 		// Taxonomy terms must be queried before terms so as not to mask any taxonomy term ID collisions.

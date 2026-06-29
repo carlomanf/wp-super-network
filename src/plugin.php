@@ -267,7 +267,7 @@ class WP_Super_Network
 		add_filter( 'delete_term_metadata_by_mid', '__return_false' );
 
 		// Register network.
-		add_action( 'plugins_loaded', array( $this->network, 'register' ) );
+		$this->network->register();
 
 		// Activate subnetworks if needed.
 		add_action( 'wp_initialize_site', array( $this, 'auto_activate_subnetwork' ) );

@@ -585,7 +585,7 @@ class Network
 	/**
 	 * Selects an entity type to be first in line for collision elimination, based on a calculated score.
 	 *
-	 * The score for each entity type is the median ID of its collisions, divided by the median ID overall.
+	 * The score for each entity type is the median ID of its hidden rows, divided by the median ID overall.
 	 * A score of 1 means the collisions are evenly distributed.
 	 * A lower score means the collisions are concentrated on the lower ID's, which are more likely to be older entities with more references and importance.
 	 *
@@ -595,23 +595,36 @@ class Network
 	 */
 	private function get_entity_by_median_score()
 	{
-		// Temporarily empty collisions.
-		$old = $this->collisions;
+		// Temporarily empty collisions and post types.
+		$collisions = $this->collisions;
+		$post_types = $this->post_types;
+
 		$this->collisions = WP_Super_Network::ENTITIES_TO_REPLACE;
+		$this->post_types = array();
+
 		$scores = WP_Super_Network::ENTITIES_TO_REPLACE;
 
 		foreach ( $scores as $entity => &$score )
 		{
-			// `ID` comes before `post_parent` in the `posts` sub-array, so `ID` will be correctly returned.
-			$id = array_search( $entity, WP_Super_Network::TABLES_TO_REPLACE[ $entity ], true );
+			if ( empty( $collisions[ $entity ] ) )
+			{
+				$score = PHP_FLOAT_MAX;
+			}
+			else
+			{
+				// `ID` comes before `post_parent` in the `posts` sub-array, so `ID` will be correctly returned.
+				$id = array_search( $entity, WP_Super_Network::TABLES_TO_REPLACE[ $entity ], true );
 
-			$collisions = $GLOBALS['wpdb']->get_col( 'SELECT `' . $id . '` FROM `' . $GLOBALS['wpdb']->__get( $entity ) . '` WHERE `' . $id . '` IN (SELECT `' . $id . '` FROM `' . $GLOBALS['wpdb']->__get( $entity ) . '` GROUP BY `' . $id . '` HAVING COUNT(*) > 1) ORDER BY `' . $id . '` ASC' );
-			$all = $GLOBALS['wpdb']->get_col( 'SELECT `' . $id . '` FROM `' . $GLOBALS['wpdb']->__get( $entity ) . '` ORDER BY `' . $id . '` ASC' );
+				$hidden = $GLOBALS['wpdb']->get_col( 'SELECT `' . $id . '` FROM `' . $GLOBALS['wpdb']->__get( $entity ) . '` WHERE `' . $id . '` IN (' . implode( ', ', $collisions[ $entity ] ) . ') ORDER BY `' . $id . '` ASC' );
+				$all = $GLOBALS['wpdb']->get_col( 'SELECT `' . $id . '` FROM `' . $GLOBALS['wpdb']->__get( $entity ) . '` ORDER BY `' . $id . '` ASC' );
 
-			$score = empty( $collisions ) ? PHP_FLOAT_MAX : $collisions[ floor( count( $collisions ) / 2 ) ] / $all[ floor( count( $all ) / 2 ) ];
+				$score = $hidden[ floor( count( $hidden ) / 2 ) ] / $all[ floor( count( $all ) / 2 ) ];
+			}
 		}
 
-		$this->collisions = $old;
+		$this->collisions = $collisions;
+		$this->post_types = $post_types;
+
 		return array_search( min( $scores ), $scores );
 	}
 
